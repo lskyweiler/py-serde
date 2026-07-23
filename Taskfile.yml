@@ -1,0 +1,17 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: '3'
+
+vars:
+  APP_VERSION:
+    sh: cat VERSION
+
+tasks:
+  default:
+    cmds:
+      - task: build-dev
+
+  build-dev:
+    desc: Build a dev build
+    cmds:
+      - uv run --dev maturin dev -r

@@ -1,0 +1,48 @@
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "py-serde"
+requires-python = ">=3.8"
+description = "Python geodetic coordinate conversions written in rust"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+]
+authors = [
+    { name = "weiler", email = "lucas.l.weiler@leidos.com" },
+]
+dynamic = ["version"]
+license = { file = "LICENSE" }
+readme = "README.md"
+
+[project.urls]
+"Homepage" = "https://github.com/lskyweiler/py-serde"
+
+[dependency-groups]
+dev = [
+    "ruff",
+    "pre-commit",
+    "pytest",
+    "pytest-cov",
+    "pytest-benchmark[histogram]",
+    "pylint",
+    "maturin",
+    "pydantic",  # for pydantic integration tests
+    "go-task-bin",  # for running Taskfile
+    # for benchmarks
+    "matplotlib",
+    'maturin[patchelf] ; platform_system != "Windows"',
+]
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+
+[tool.ruff]
+extend-exclude = [".venv", "target"]
+
+[tool.pylint.main]
+ignore = ["test", ".venv", "examples", "tools", "resources", "docs", "target"]
+ignore-pattern = ["^test_*", "py_serde.pyi"]

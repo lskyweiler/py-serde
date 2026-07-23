@@ -1,0 +1,29 @@
+[package]
+name = "py-serde"
+authors = ["Lucas Weiler <lucas.l.weiler@leidos.com>"]
+version = "0.1.0"
+edition = "2024"
+description = "Generic python object deserialization written in rust"
+keywords = ["deserialization", "utilities"]
+license-file = "LICENSE"
+homepage = "https://github.com/lskyweiler/py-serde"
+repository = "https://github.com/lskyweiler/py-serde"
+readme = "README.md"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "py_serde"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "~0.27", features = [
+    "extension-module",
+    "generate-import-lib",
+] }
+pyo3-stub-gen = { version = "~0.19", default-features = false }
+serde = { version = "~1.0", features = ["derive"] }
+serde_json = "~1.0"
+
+[profile.release]
+# https://github.com/johnthagen/min-sized-rust
+strip = true # Automatically strip symbols from the binary.
