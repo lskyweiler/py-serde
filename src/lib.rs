@@ -33,12 +33,20 @@ mod py_serde {
     /// ```
     #[pyfunction]
     #[gen_stub_pyfunction]
-    fn construct_object_json<'py>(py: Python<'py>, object_json_str: String) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (object_json_str, entry_point_group = ""))]
+    fn construct_object_json<'py>(
+        py: Python<'py>,
+        object_json_str: String,
+        entry_point_group: &str,
+    ) -> PyResult<Py<PyAny>> {
         let mut json_de: serde_json::Deserializer<serde_json::de::StrRead<'_>> =
             serde_json::de::Deserializer::from_str(&object_json_str);
         let py_import_obj_de = deserialize::PyObjectDeserializer::new(py);
+        
         match py_import_obj_de.deserialize(&mut json_de) {
-            Ok(py_import_obj) => py_import_obj.construct_object(),
+            Ok(mut py_import_obj) => py_import_obj
+                .with_entry_point_group(entry_point_group.to_string())
+                .try_construct_object(),
             Err(what) => Err(PyValueError::new_err(format!("{:?}", what))),
         }
     }
@@ -67,9 +75,15 @@ mod py_serde {
     /// ```
     #[pyfunction]
     #[gen_stub_pyfunction]
-    fn construct_object<'py>(object_dict: Bound<'py, PyDict>) -> PyResult<Py<PyAny>> {
-        let import_obj = py_import_object::PyImportObject::from_dict(object_dict)?;
-        import_obj.construct_object()
+    #[pyo3(signature = (object_dict, entry_point_group = py_import_object::DEFAULT_ENTRY_POINT_GROUP))]
+    fn construct_object<'py>(
+        object_dict: Bound<'py, PyDict>,
+        entry_point_group: &str,
+    ) -> PyResult<Py<PyAny>> {
+        let mut import_obj = py_import_object::PyImportObject::from_dict(object_dict)?;
+        import_obj.with_entry_point_group(entry_point_group.to_string());
+
+        import_obj.try_construct_object()
     }
 }
 define_stub_info_gatherer!(stub_info);
