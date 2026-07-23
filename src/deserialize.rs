@@ -1,7 +1,8 @@
-use pyo3::{prelude::*, types::PyFloat};
+use crate::py_import_object::PyImportObject;
+use pyo3::{prelude::*, types::PyDict};
 use serde::{
-    de::{DeserializeSeed, Deserializer, Visitor},
     Deserialize,
+    de::{DeserializeSeed, Deserializer, Error, Visitor},
 };
 
 /// An object to allow deserialization of any python object
@@ -49,20 +50,29 @@ enum PyImportDictFields {
 }
 
 /// Serialize a single PyImportDict into a Py<PyAny> object
-pub struct PyObjectDeserializer<'py>(pub Python<'py>);
+pub struct PyObjectDeserializer<'py> {
+    py: Python<'py>,
+}
+impl<'py> PyObjectDeserializer<'py> {
+    pub fn new(py: Python<'py>) -> Self {
+        Self { py }
+    }
+}
 impl<'py, 'de> DeserializeSeed<'de> for PyObjectDeserializer<'py> {
-    type Value = Py<PyAny>;
+    type Value = PyImportObject<'py>;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
         D: Deserializer<'de>,
     {
-        deserializer.deserialize_map(PyObjectVisitor(self.0))
+        deserializer.deserialize_map(PyObjectVisitor { py: self.py })
     }
 }
-struct PyObjectVisitor<'py>(Python<'py>);
+struct PyObjectVisitor<'py> {
+    py: Python<'py>,
+}
 impl<'py, 'de> Visitor<'de> for PyObjectVisitor<'py> {
-    type Value = Py<PyAny>;
+    type Value = PyImportObject<'py>;
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         formatter.write_str("PyImportDict")
     }
@@ -71,24 +81,32 @@ impl<'py, 'de> Visitor<'de> for PyObjectVisitor<'py> {
         A: serde::de::MapAccess<'de>,
     {
         let mut import: Option<String> = None;
-        let mut kwargs: Option<Py<PyAny>> = None;
+        let mut data: Option<Bound<'py, PyDict>> = None;
         let mut entry_point: Option<String> = None;
         while let Some(key) = map.next_key()? {
             match key {
                 PyImportDictFields::ObjectImport => import = Some(map.next_value::<String>()?),
-                PyImportDictFields::ObjectEntryPoint => entry_point = Some(map.next_value::<String>()?),
+                PyImportDictFields::ObjectEntryPoint => {
+                    entry_point = Some(map.next_value::<String>()?)
+                }
                 PyImportDictFields::Data => {
                     let _ = map.next_value::<String>()?;
-                    kwargs = Some(
-                        PyFloat::new(self.0, 100.)
-                            .unbind()
-                            .clone_ref(self.0)
-                            .into_any(),
-                    )
+                    data = Some(PyDict::new(self.py))
                 }
             }
         }
 
-        Ok(kwargs.unwrap())
+        if data.is_none() {
+            return Err(A::Error::custom(
+                "Data must be defined in the python import dict",
+            ));
+        }
+        if !(import.is_none() ^ entry_point.is_none()) {
+            return Err(A::Error::custom(
+                "An object import or object entry_point must be dfined. But not both",
+            ));
+        }
+
+        Ok(PyImportObject::new(import, entry_point, data.unwrap()))
     }
 }

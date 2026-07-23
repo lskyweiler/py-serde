@@ -13,7 +13,7 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
 name = "py_serde"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 pyo3 = { version = "~0.27", features = [
@@ -21,6 +21,7 @@ pyo3 = { version = "~0.27", features = [
     "generate-import-lib",
 ] }
 pyo3-stub-gen = { version = "~0.19", default-features = false }
+env_logger = "~0.11" # for stub gens
 serde = { version = "~1.0", features = ["derive"] }
 serde_json = "~1.0"
 

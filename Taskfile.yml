@@ -15,3 +15,15 @@ tasks:
     desc: Build a dev build
     cmds:
       - uv run --dev maturin dev -r
+
+  gen-stubs:
+    desc: Generate python stub file
+    cmds:
+      - cargo run stub_gen
+
+  test:
+    desc: Run all rust and python unit tests
+    deps: [build-dev]
+    cmds:
+      - uv run pytest .
+      - cargo test
