@@ -17,7 +17,6 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 pyo3 = { version = "~0.27", features = [
-    "extension-module",
     "generate-import-lib",
 ] }
 pyo3-stub-gen = { version = "~0.19", default-features = false }
@@ -28,3 +27,8 @@ serde_json = "~1.0"
 [profile.release]
 # https://github.com/johnthagen/min-sized-rust
 strip = true # Automatically strip symbols from the binary.
+
+[features]
+# extension-module makes running the embedded rust python tests difficult since it doesn't link to libpython
+default = ["pyo3/extension-module"]
+test = ["pyo3/auto-initialize"]
