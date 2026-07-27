@@ -39,7 +39,7 @@ mod py_serde {
         py: Python<'py>,
         object_json_str: String,
         config: Option<py_import_config::PyImportConfig>,
-    ) -> PyResult<Py<PyAny>> {
+    ) -> PyResult<Bound<'py, PyAny>> {
         match py_import_object::PyImportObject::from_serde_json_str(
             py,
             &object_json_str,
@@ -78,7 +78,7 @@ mod py_serde {
     fn construct_object<'py>(
         object_dict: Bound<'py, PyDict>,
         config: Option<py_import_config::PyImportConfig>,
-    ) -> PyResult<Py<PyAny>> {
+    ) -> PyResult<Bound<'py, PyAny>> {
         let import_obj =
             py_import_object::PyImportObject::from_dict(object_dict, config.unwrap_or_default())?;
         import_obj.try_construct_object()

@@ -1,25 +1,44 @@
 import py_serde
 import pydantic
 import dataclasses
+import ipaddress
 
 
 @dataclasses.dataclass
-class TestFoo:
+class Foo:
     a: int = 100
     b: list[float] = dataclasses.field(default_factory=lambda: [1.0, 2.0, 3.0])
 
 
-class TestFooPydantic(pydantic.BaseModel):
-    x: float = 100.0
+class FooPydantic(pydantic.BaseModel):
+    foo: Foo
 
 
 class TestDeserialization:
+    def test_builtin(self):
+        obj = {
+            "object_import": "ipaddress.IPv4Address",
+            "data": {"address": "127.0.0.1"},
+        }
+        constructed = py_serde.construct_object(obj)
+        assert isinstance(constructed, ipaddress.IPv4Address)
+        assert str(constructed) == "127.0.0.1"
+
     def test_dict_simple_dataclass(self):
         obj = {
-            "import": "test_deserialization.TestFoo",
+            "object_import": "test_deserialize.Foo",
             "data": {"a": 500, "b": [5.0, 6.0]},
         }
         constructed = py_serde.construct_object(obj)
-        assert isinstance(constructed, TestFoo)
-        assert constructed.a == 100
+        assert isinstance(constructed, Foo)
+        assert constructed.a == 500
         assert constructed.b == [5.0, 6.0]
+
+    def test_pydantic_obj(self):
+        obj = {
+            "object_import": "test_deserialize.FooPydantic",
+            "data": {"foo": {"a": 500, "b": [7.0, 8.0]}},
+        }
+        constructed = py_serde.construct_object(obj)
+        assert isinstance(constructed, FooPydantic)
+        assert isinstance(constructed.foo, Foo)

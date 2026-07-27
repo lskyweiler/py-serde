@@ -1,9 +1,10 @@
 use pyo3::{
     exceptions::{PyKeyError, PyValueError},
     prelude::*,
-    types::{PyDict, PyDictMethods, PyString, PyType},
+    types::*,
 };
 use serde_json;
+use std::ffi::CString;
 
 /// Converts a serde_json::Value object into a PyDict
 pub fn json_value_to_py_dict<'py>(
@@ -28,9 +29,14 @@ pub fn import_obj_from_qual_path<'py>(
     py: Python<'py>,
     obj_import: &str,
 ) -> PyResult<Bound<'py, PyType>> {
-    let (path, class_name) = obj_import
-        .rsplit_once(".")
-        .expect("Could not split string into module path and class name. Use format mod.mod.Class");
+    let (path, class_name) = match obj_import.rsplit_once(".") {
+        Some((path, class_name)) => (path, class_name),
+        None => {
+            return Err(PyValueError::new_err(
+                "Could not split string into module path and class name. Use format mod.mod.Class",
+            ));
+        }
+    };
 
     let importlib_mod = py.import("importlib")?;
     let imported = importlib_mod.call_method1("import_module", (path,))?;
@@ -72,6 +78,46 @@ pub fn import_obj_from_entry_point<'py>(
             name, group
         ))),
     }
+}
+
+/// Check if a py object is a sequence
+pub fn is_iterable<'py>(py_obj: &Bound<'py, PyAny>) -> bool {
+    py_obj.is_instance_of::<PyList>()
+        || py_obj.is_instance_of::<PyTuple>()
+        || py_obj.is_instance_of::<PySet>()
+}
+
+pub fn is_pydantic_baseclass<'py>(py_obj: &Bound<'py, PyAny>) -> PyResult<bool> {
+    let py = py_obj.py();
+    // If pydantic is not a module, it can never be a pydantic baseclass
+    match py.import("pydantic") {
+        Ok(pydantic_mod) => {
+            let baseclass = pydantic_mod.getattr("BaseModel")?;
+            py_obj.is_instance(&baseclass)
+        }
+        Err(_) => Ok(false),
+    }
+}
+
+/// Loads python code as a module and adds it to the sys modules
+pub fn add_python_module_from_code<'py>(
+    py: Python<'py>,
+    code: &str,
+    mod_name: &str,
+) -> PyResult<()> {
+    let module = PyModule::from_code(
+        py,
+        CString::new(code).unwrap().as_c_str(),
+        CString::new(format!("{}.py", mod_name)).unwrap().as_c_str(),
+        CString::new(mod_name).unwrap().as_c_str(),
+    )
+    .unwrap();
+
+    let sys = py.import("sys")?;
+    let sys_modules: Bound<'_, PyDict> = sys.getattr("modules")?.extract()?;
+    sys_modules.set_item(mod_name, &module)?;
+
+    Ok(())
 }
 
 #[cfg(test)]

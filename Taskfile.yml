@@ -16,6 +16,12 @@ tasks:
     cmds:
       - uv run --dev maturin dev -r
 
+  clean:
+    desc: Clean all build artifacts
+    cmds:
+      - rm -rf .venv
+      - rm -rf target
+
   gen-stubs:
     desc: Generate python stub file
     cmds:
@@ -31,7 +37,8 @@ tasks:
     desc: Run only python tests
     deps: [build-dev]
     cmds:
-      - uv run pytest .
+      # - uv run pytest .
+      - pytest .
 
   test:
     desc: Run all rust and python unit tests

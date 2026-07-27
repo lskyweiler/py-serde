@@ -2,7 +2,7 @@ use crate::{py_import_config::PyImportConfig, utils};
 use pyo3::{
     exceptions::{PyKeyError, PyNotImplementedError},
     prelude::*,
-    types::{PyDict, PyType},
+    types::*,
 };
 use serde::de::DeserializeSeed;
 
@@ -178,12 +178,12 @@ impl<'py> PyImportObject<'py> {
             }
         };
 
-        Ok(Self {
-            import_path: maybe_import,
-            entry_point: maybe_entry_point,
-            config: cfg.clone(),
-            data: data,
-        })
+        Ok(Self::new(
+            maybe_import,
+            maybe_entry_point,
+            cfg.clone(),
+            data,
+        ))
     }
 
     /// Gets a class object for this object using either the import path or entry point name
@@ -206,13 +206,17 @@ impl<'py> PyImportObject<'py> {
         }
     }
 
-    pub fn try_construct_object_bound(&self) -> PyResult<Bound<'py, PyAny>> {
+    pub fn try_construct_object(&self) -> PyResult<Bound<'py, PyAny>> {
         let class_type = self.get_object_type()?;
-        class_type.call((), Some(&self.data))
-    }
-    pub fn try_construct_object(&self) -> PyResult<Py<PyAny>> {
-        let bound = self.try_construct_object_bound()?;
-        Ok(bound.unbind())
+
+        if utils::is_pydantic_baseclass(&class_type)? {
+            class_type.call_method1("model_validate", (self.data.clone(),))
+        } else {
+            // Class(**kwargs)
+            let de_data =
+                recursive_deserialize_import_dict(self.data.as_any().clone(), &self.config)?;
+            class_type.call((), Some(&de_data.cast_into::<PyDict>()?))
+        }
     }
 
     pub fn from_serde_json_str(
@@ -226,12 +230,44 @@ impl<'py> PyImportObject<'py> {
     }
 }
 
+/// recursively import a serialized import dictionary
+fn recursive_deserialize_import_dict<'py>(
+    value: Bound<'py, PyAny>,
+    config: &PyImportConfig,
+) -> PyResult<Bound<'py, PyAny>> {
+    if utils::is_iterable(&value) {
+        let r_list = PyList::empty(value.py());
+        for item in value.try_iter()? {
+            r_list.append(recursive_deserialize_import_dict(item.unwrap(), &config)?)?;
+            return Ok(r_list.into_any());
+        }
+    } else if !value.is_instance_of::<PyDict>() {
+        return Ok(value);
+    }
+
+    let new_dict = PyDict::new(value.py());
+    for (key, value) in value.cast_into::<PyDict>()?.iter() {
+        let new_key = recursive_deserialize_import_dict(key, &config)?;
+        let new_val = recursive_deserialize_import_dict(value, &config)?;
+        new_dict.set_item(new_key, new_val)?;
+    }
+
+    match PyImportObject::from_dict(new_dict.clone(), config.clone()) {
+        Ok(val) => {
+            return val.try_construct_object();
+        }
+        Err(_) => {
+            // not an import dict, just pas along
+            return Ok(new_dict.into_any());
+        }
+    }
+}
+
 #[cfg(test)]
 mod test_py_object_import {
+    use super::*;
     use crate::py_import_config;
 
-    use super::*;
-    use pyo3::types::{PyDictMethods, PyTypeMethods};
     #[test]
     fn test_simple_deserde() {
         let json_str = r#"{
@@ -274,7 +310,7 @@ mod test_py_object_import {
             .unwrap();
 
             let actual = py_obj.try_construct_object().unwrap();
-            let actual_type = actual.bind(py).get_type();
+            let actual_type = actual.get_type();
             assert_eq!(actual_type.name().unwrap(), "IPv4Address");
         });
     }
@@ -300,6 +336,36 @@ mod test_py_object_import {
 
             assert!(py_obj.data.contains("a").unwrap());
             assert!(py_obj.data.contains("b").unwrap());
+        });
+    }
+
+    #[test]
+    fn test_deserde_dataclass() {
+        let py_mod = r#"
+import dataclasses
+
+@dataclasses.dataclass
+class Foo:
+    a: int = 100
+    b: list[float] = dataclasses.field(default_factory=lambda: [1.0, 2.0, 3.0])      
+        "#;
+
+        Python::attach(|py| {
+            utils::add_python_module_from_code(py, py_mod, "rstest").unwrap();
+
+            let json_str = r#"{
+                "object_import": "rstest.Foo",
+                "data": {"a": 500, "b": [5.0, 6.0]}
+            }"#;
+            Python::attach(|py| {
+                let py_obj =
+                    PyImportObject::from_serde_json_str(py, json_str, PyImportConfig::default())
+                        .unwrap();
+
+                let actual = py_obj.try_construct_object().unwrap();
+                let actual_type = actual.get_type();
+                assert_eq!(actual_type.name().unwrap(), "Foo");
+            });
         });
     }
 }

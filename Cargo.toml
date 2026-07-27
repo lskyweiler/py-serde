@@ -14,13 +14,12 @@ readme = "README.md"
 [lib]
 name = "py_serde"
 crate-type = ["cdylib", "rlib"]
+doctest = false
 
 [dependencies]
-pyo3 = { version = "~0.27", features = [
-    "generate-import-lib",
-] }
+pyo3 = { version = "~0.27", features = ["generate-import-lib"] }
 pyo3-stub-gen = { version = "~0.19", default-features = false }
-env_logger = "~0.11" # for stub gens
+env_logger = "~0.11"                                             # for stub gens
 serde = { version = "~1.0", features = ["derive"] }
 serde_json = "~1.0"
 
