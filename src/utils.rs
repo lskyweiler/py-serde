@@ -80,13 +80,7 @@ pub fn import_obj_from_entry_point<'py>(
     }
 }
 
-/// Check if a py object is a sequence
-pub fn is_iterable<'py>(py_obj: &Bound<'py, PyAny>) -> bool {
-    py_obj.is_instance_of::<PyList>()
-        || py_obj.is_instance_of::<PyTuple>()
-        || py_obj.is_instance_of::<PySet>()
-}
-
+/// Check if a given python object inherits from a pydantic.BaseModel
 pub fn is_pydantic_baseclass<'py>(py_obj: &Bound<'py, PyAny>) -> PyResult<bool> {
     let py = py_obj.py();
     // If pydantic is not a module, it can never be a pydantic baseclass

@@ -10,13 +10,18 @@ pub const DEFAULT_DATA_POINT_KEY: &str = "data";
 #[pyclass]
 #[gen_stub_pyclass]
 pub struct PyImportConfig {
+    /// Apply this entry point to all objects that do not define their own
     #[pyo3(get, set)]
     pub entry_point_group: String,
 
+    /// Use this key to pull out the object's optional import path
     #[pyo3(get, set)]
     pub object_import_key: String,
+    /// Use this key to pull out the object's optional entry point
     #[pyo3(get, set)]
     pub object_entry_point_key: String,
+
+    /// Key to use to grab data from. Used as Object(**kwargs)
     #[pyo3(get, set)]
     pub data_key: String,
 }

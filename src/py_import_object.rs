@@ -1,63 +1,12 @@
 use crate::{py_import_config::PyImportConfig, utils};
-use pyo3::{
-    exceptions::{PyKeyError, PyNotImplementedError},
-    prelude::*,
-    types::*,
-};
+use pyo3::{exceptions::PyKeyError, prelude::*, types::*};
 use serde::de::DeserializeSeed;
 
 /// Module to handle serializing and deserializing PyImportObjects. This is in this file to avoid circular imports
 mod py_obj_serde {
     use super::*;
     use crate::utils;
-    use serde::{
-        Deserialize,
-        de::{Deserializer, Error, Visitor},
-    };
-
-    /// An object to allow deserialization of any python object
-    ///
-    /// Strategy for importing an object goes as follows:
-    ///     - get class object from import path or entrypoint
-    ///     - If object is a pydantic model: use model_validate(**kwargs)
-    ///     - Else recursively construct objects from the kwargs, then send into the object's constructor as Object(**kwargs)
-    ///
-    /// Note: Either an import or an entry_point must be defined, but not both
-    ///
-    /// # Examples
-    /// ```json
-    /// {
-    ///     "object_import": "foo.bar.Baz",
-    ///     "data": {
-    ///         "x": 100.0,
-    ///         "complex": {
-    ///             "object_import": "foo.Foo",
-    ///             "data": {"a": [100.0]}
-    ///         },
-    ///         "pydantic_obj": {
-    ///             "a": 100.0,
-    ///             "b": {
-    ///                 "x": 100, "y": 100, "z": 100
-    ///             }
-    ///         }
-    ///     }
-    /// }
-    /// ```
-    #[derive(Deserialize)]
-    #[serde(field_identifier, rename_all = "snake_case")]
-    enum PyImportDictFields {
-        /// Full qualpath to python class
-        ///
-        /// * Example
-        /// `foo.bar.baz.Foo`
-        ObjectImport,
-        /// Entrypoint name to lookup under the simplipy.components group
-        ObjectEntryPoint,
-
-        /// Data to instantiate the object as **kwargs
-        /// May contain other PyImportDict objects to recursively instantiate
-        Data,
-    }
+    use serde::de::{Deserializer, Error, Visitor};
 
     /// Serialize a single PyImportDict into a Py<PyAny> object
     pub struct PyObjectDeserializer<'py> {
@@ -97,20 +46,27 @@ mod py_obj_serde {
         {
             let mut import: Option<String> = None;
             let mut data: Option<Bound<'py, PyDict>> = None;
-            let mut entry_point: Option<String> = None;
-            // todo: support keys from PyImportConfig
-            while let Some(key) = map.next_key()? {
+            let mut entry_point: Option<EntryPoint> = None;
+            while let Some(key) = map.next_key::<String>()? {
                 match key {
-                    PyImportDictFields::ObjectImport => import = Some(map.next_value::<String>()?),
-                    PyImportDictFields::ObjectEntryPoint => {
-                        entry_point = Some(map.next_value::<String>()?)
+                    val if val == self.py_import_cfg.object_import_key => {
+                        import = Some(map.next_value::<String>()?)
                     }
-                    PyImportDictFields::Data => {
+                    val if val == self.py_import_cfg.entry_point_group => {
+                        entry_point = Some(map.next_value::<EntryPoint>()?);
+                    }
+                    val if val == self.py_import_cfg.data_key => {
                         let val = map.next_value::<serde_json::Value>()?;
                         data = match utils::json_value_to_py_dict(self.py, val) {
                             Ok(data) => Some(data),
                             Err(what) => return Err(A::Error::custom(format!("{:?}", what))),
                         };
+                    }
+                    val => {
+                        return Err(A::Error::custom(format!(
+                            "Got unknown field in PyImport dict {}",
+                            val
+                        )));
                     }
                 }
             }
@@ -120,18 +76,19 @@ mod py_obj_serde {
                     "Data must be defined in the python import dict",
                 ));
             }
-            if !(import.is_none() ^ entry_point.is_none()) {
-                return Err(A::Error::custom(
-                    "An object import or object entry_point must be dfined. But not both",
-                ));
-            }
 
-            Ok(PyImportObject::new(
-                import,
-                entry_point,
-                self.py_import_cfg,
-                data.unwrap(),
-            ))
+            match PyImportType::from_either(import, entry_point) {
+                Some(py_imp) => Ok(PyImportObject::new(
+                    py_imp,
+                    self.py_import_cfg,
+                    data.unwrap(),
+                )),
+                None => {
+                    return Err(A::Error::custom(
+                        "An object import or object entry_point must be dfined. But not both",
+                    ));
+                }
+            }
         }
     }
 }
@@ -139,24 +96,37 @@ mod py_obj_serde {
 // re-export
 pub use py_obj_serde::PyObjectDeserializer;
 
+#[derive(Clone, serde::Deserialize, serde::Serialize)]
+pub struct EntryPoint {
+    pub name: String,
+    pub group: Option<String>,
+}
+
+pub enum PyImportType {
+    ImportPath(String),
+    EntryPoint(EntryPoint),
+}
+impl PyImportType {
+    pub fn from_either(import: Option<String>, entry_point: Option<EntryPoint>) -> Option<Self> {
+        if !(import.is_none() ^ entry_point.is_none()) {
+            return None;
+        } else if import.is_some() {
+            return Some(Self::ImportPath(import.unwrap()));
+        } else {
+            return Some(Self::EntryPoint(entry_point.unwrap()));
+        }
+    }
+}
+
 pub struct PyImportObject<'py> {
-    import_path: Option<String>,
-    entry_point: Option<String>,
-
+    import_type: PyImportType,
     config: PyImportConfig,
-
     data: Bound<'py, PyDict>,
 }
 impl<'py> PyImportObject<'py> {
-    pub fn new(
-        import_path: Option<String>,
-        entry_point: Option<String>,
-        cfg: PyImportConfig,
-        data: Bound<'py, PyDict>,
-    ) -> Self {
+    pub fn new(import_type: PyImportType, cfg: PyImportConfig, data: Bound<'py, PyDict>) -> Self {
         Self {
-            import_path,
-            entry_point,
+            import_type,
             data,
             config: cfg,
         }
@@ -165,9 +135,22 @@ impl<'py> PyImportObject<'py> {
         let maybe_import: Option<String> = object_dict
             .get_item(&cfg.object_import_key)?
             .and_then(|val| val.extract().ok()?);
-        let maybe_entry_point: Option<String> = object_dict
-            .get_item(&cfg.object_entry_point_key)?
-            .and_then(|val| val.extract().ok()?);
+        let maybe_entry_point = match object_dict.get_item(&cfg.object_entry_point_key)? {
+            Some(d) => {
+                let ep_dict = d.cast::<PyDict>()?;
+                let name = match ep_dict.get_item("name")? {
+                    Some(n) => n.to_string(),
+                    None => return Err(PyKeyError::new_err("An entry point requires a name")),
+                };
+                let group = match ep_dict.get_item("group")? {
+                    Some(g) => Some(g.to_string()),
+                    None => None,
+                };
+
+                Some(EntryPoint { name, group })
+            }
+            None => None,
+        };
 
         let data = match object_dict.get_item(&cfg.data_key)? {
             Some(d) => d.extract()?,
@@ -177,32 +160,28 @@ impl<'py> PyImportObject<'py> {
                 ));
             }
         };
-
-        Ok(Self::new(
-            maybe_import,
-            maybe_entry_point,
-            cfg.clone(),
-            data,
-        ))
+        match PyImportType::from_either(maybe_import, maybe_entry_point) {
+            Some(py_imp) => Ok(Self::new(py_imp, cfg.clone(), data)),
+            None => {
+                return Err(PyKeyError::new_err(
+                    "Data must exist in an python import dict",
+                ));
+            }
+        }
     }
 
     /// Gets a class object for this object using either the import path or entry point name
     fn get_object_type(&self) -> PyResult<Bound<'py, PyType>> {
-        if self.import_path.is_some() {
-            return utils::import_obj_from_qual_path(
+        match &self.import_type {
+            PyImportType::ImportPath(imp) => utils::import_obj_from_qual_path(self.data.py(), &imp),
+            PyImportType::EntryPoint(ep) => utils::import_obj_from_entry_point(
                 self.data.py(),
-                self.import_path.as_ref().unwrap(),
-            );
-        } else if self.entry_point.is_some() {
-            return utils::import_obj_from_entry_point(
-                self.data.py(),
-                self.entry_point.as_ref().unwrap(),
-                &self.config.entry_point_group,
-            );
-        } else {
-            Err(PyNotImplementedError::new_err(
-                "You must define either an import path or entry point name",
-            ))
+                &ep.name,
+                match &ep.group {
+                    Some(specific_group) => &specific_group,
+                    None => &self.config.entry_point_group,
+                },
+            ),
         }
     }
 
@@ -230,17 +209,20 @@ impl<'py> PyImportObject<'py> {
     }
 }
 
-/// recursively import a serialized import dictionary
+/// Recursively import a serialized import dictionary
 fn recursive_deserialize_import_dict<'py>(
     value: Bound<'py, PyAny>,
     config: &PyImportConfig,
 ) -> PyResult<Bound<'py, PyAny>> {
-    if utils::is_iterable(&value) {
+    if value.is_instance_of::<PyList>()
+        || value.is_instance_of::<PyTuple>()
+        || value.is_instance_of::<PySet>()
+    {
         let r_list = PyList::empty(value.py());
         for item in value.try_iter()? {
             r_list.append(recursive_deserialize_import_dict(item.unwrap(), &config)?)?;
-            return Ok(r_list.into_any());
         }
+        return Ok(r_list.into_any());
     } else if !value.is_instance_of::<PyDict>() {
         return Ok(value);
     }
@@ -285,9 +267,10 @@ mod test_py_object_import {
             )
             .unwrap();
 
-            assert!(py_obj.import_path.is_some());
-            let imp = py_obj.import_path.unwrap();
-            assert_eq!(imp, "test");
+            match py_obj.import_type {
+                PyImportType::EntryPoint(_) => panic!("Should be import"),
+                PyImportType::ImportPath(imp) => assert_eq!(imp, "test"),
+            };
 
             assert!(py_obj.data.contains("a").unwrap());
             assert!(py_obj.data.contains("b").unwrap());
@@ -330,9 +313,10 @@ mod test_py_object_import {
             let object_dict: Bound<'_, PyDict> = object_any.extract().unwrap();
             let py_obj = PyImportObject::from_dict(object_dict, PyImportConfig::default()).unwrap();
 
-            assert!(py_obj.import_path.is_some());
-            let imp = py_obj.import_path.unwrap();
-            assert_eq!(imp, "test");
+            match py_obj.import_type {
+                PyImportType::EntryPoint(_) => panic!("Should be import"),
+                PyImportType::ImportPath(imp) => assert_eq!(imp, "test"),
+            };
 
             assert!(py_obj.data.contains("a").unwrap());
             assert!(py_obj.data.contains("b").unwrap());
