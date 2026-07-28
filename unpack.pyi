@@ -4,11 +4,16 @@
 import builtins
 import typing
 __all__ = [
+    "PyImportConfig",
     "construct_object",
     "construct_object_json",
 ]
 
-def construct_object(object_dict: dict) -> typing.Any:
+@typing.final
+class PyImportConfig:
+    ...
+
+def construct_object(object_dict: dict, config: typing.Optional[PyImportConfig]) -> typing.Any:
     r"""
     Constructs a single python object from a PyImport dictionary
     
@@ -35,7 +40,7 @@ def construct_object(object_dict: dict) -> typing.Any:
     ```
     """
 
-def construct_object_json(object_json_str: builtins.str) -> typing.Any:
+def construct_object_json(object_json_str: builtins.str, config: typing.Optional[PyImportConfig]) -> typing.Any:
     r"""
     Constructs a single python object from a serialized PyImport json string
     

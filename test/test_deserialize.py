@@ -1,7 +1,11 @@
-import unpack
-import pydantic
+from __future__ import annotations
+
 import dataclasses
 import ipaddress
+
+import pydantic
+
+import unpack
 
 
 @dataclasses.dataclass
@@ -42,3 +46,5 @@ class TestDeserialization:
         constructed = unpack.construct_object(obj)
         assert isinstance(constructed, FooPydantic)
         assert isinstance(constructed.foo, Foo)
+
+        assert constructed.foo.b == [7.0, 8.0]

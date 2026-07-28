@@ -1,6 +1,6 @@
 mod py_import_config;
 mod py_import_object;
-mod utils;
+pub mod utils;
 
 use pyo3::prelude::*;
 use pyo3_stub_gen::{define_stub_info_gatherer, derive::*};
@@ -88,6 +88,5 @@ define_stub_info_gatherer!(stub_info);
 
 pub mod prelude {
     use super::*;
-    pub use py_import_object::{PyImportObject, PyObjectDeserializer};
-    pub use utils::*;
+    pub use py_import_object::{PyImportObject, PyObjectDeserializer, PyImportType, EntryPoint};
 }

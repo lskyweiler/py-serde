@@ -45,3 +45,9 @@ tasks:
     cmds:
       - task: test-rs
       - task: test-py
+
+  code:
+    desc: Run code formating and check fixing
+    cmds:
+      - uv run ruff format
+      - uv run ruff check --select I --fix

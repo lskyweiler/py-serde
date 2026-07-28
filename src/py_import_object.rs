@@ -177,6 +177,7 @@ impl<'py> PyImportObject<'py> {
             PyImportType::EntryPoint(ep) => utils::import_obj_from_entry_point(
                 self.data.py(),
                 &ep.name,
+                // An object's entry point group overrides the global entry point config group
                 match &ep.group {
                     Some(specific_group) => &specific_group,
                     None => &self.config.entry_point_group,
@@ -239,7 +240,7 @@ fn recursive_deserialize_import_dict<'py>(
             return val.try_construct_object();
         }
         Err(_) => {
-            // not an import dict, just pas along
+            // not an import dict, just pass along
             return Ok(new_dict.into_any());
         }
     }
