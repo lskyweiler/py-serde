@@ -3,7 +3,7 @@ requires = ["maturin>=1.5,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "py-serde"
+name = "unpack"
 requires-python = ">=3.8"
 description = "Python geodetic coordinate conversions written in rust"
 classifiers = [
@@ -19,7 +19,7 @@ license = { file = "LICENSE" }
 readme = "README.md"
 
 [project.urls]
-"Homepage" = "https://github.com/lskyweiler/py-serde"
+"Homepage" = "https://github.com/lskyweiler/unpack"
 
 [dependency-groups]
 dev = [
@@ -39,10 +39,11 @@ dev = [
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
+module-name = "unpack"
 
 [tool.ruff]
 extend-exclude = [".venv", "target"]
 
 [tool.pylint.main]
 ignore = ["test", ".venv", "examples", "tools", "resources", "docs", "target"]
-ignore-pattern = ["^test_*", "py_serde.pyi"]
+ignore-pattern = ["^test_*", "unpack.pyi"]

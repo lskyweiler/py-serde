@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://taskfile.dev/schema.json
 
-version: '3'
+version: "3"
 
 vars:
   APP_VERSION:
@@ -16,14 +16,38 @@ tasks:
     cmds:
       - uv run --dev maturin dev -r
 
+  clean:
+    desc: Clean all build artifacts
+    cmds:
+      - rm -rf .venv
+      - rm -rf target
+
   gen-stubs:
     desc: Generate python stub file
     cmds:
       - cargo run stub_gen
 
-  test:
-    desc: Run all rust and python unit tests
+  test-rs:
+    desc: Run only rust tests
     deps: [build-dev]
     cmds:
-      - uv run pytest .
-      - cargo test
+      - cargo test --features test --no-default-features
+
+  test-py:
+    desc: Run only python tests
+    deps: [build-dev]
+    cmds:
+      # - uv run pytest .
+      - pytest .
+
+  test:
+    desc: Run all rust and python unit tests
+    cmds:
+      - task: test-rs
+      - task: test-py
+
+  code:
+    desc: Run code formating and check fixing
+    cmds:
+      - uv run ruff format
+      - uv run ruff check --select I --fix

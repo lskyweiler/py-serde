@@ -1,11 +1,5 @@
-# unpack
+from __future__ import annotations
 
-Complete object deserialization, including type information
-
-Can be used as a rust library to deserialize python objects compltely in rust, or as a python library
-
-### Python Usage
-```python
 import dataclasses
 
 import pydantic
@@ -61,24 +55,3 @@ obj = {
 constructed = unpack.construct_object(obj)
 
 print(constructed.__class__.__name__)  # > MyObject
-```
-
-
-### Rust Usage
-```rust
-use py_unpack::prelude::*;
-
-let json_str = r#"{
-    "object_import": "rstest.Foo",
-    "data": {"a": 500, "b": [5.0, 6.0]}
-}"#;
-let py_obj =
-    PyImportObject::from_serde_json_str(py, json_str, PyImportConfig::default())
-        .expect("Failed to deserialize");
-
-let actual = py_obj
-    .try_construct_object()
-    .expect("Unable to recursively construct object");
-let actual_type = actual.get_type();
-assert_eq!(actual_type.name().unwrap(), "Foo");
-```
