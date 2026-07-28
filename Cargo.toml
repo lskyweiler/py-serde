@@ -1,18 +1,18 @@
 [package]
-name = "py-serde"
+name = "unpack"
 authors = ["Lucas Weiler <lucas.l.weiler@leidos.com>"]
 version = "0.1.0"
 edition = "2024"
 description = "Generic python object deserialization written in rust"
 keywords = ["deserialization", "utilities"]
 license-file = "LICENSE"
-homepage = "https://github.com/lskyweiler/py-serde"
-repository = "https://github.com/lskyweiler/py-serde"
+homepage = "https://github.com/lskyweiler/unpack"
+repository = "https://github.com/lskyweiler/unpack"
 readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
-name = "py_serde"
+name = "unpack"
 crate-type = ["cdylib", "rlib"]
 doctest = false
 

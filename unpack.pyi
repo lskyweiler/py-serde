@@ -12,7 +12,7 @@ def construct_object(object_dict: dict) -> typing.Any:
     r"""
     Constructs a single python object from a PyImport dictionary
     
-    Equivalent to ```py_serde.construct_object_json(json.loads(json_str))```
+    Equivalent to ```unpack.construct_object_json(json.loads(json_str))```
     
     # Examples
     ```json

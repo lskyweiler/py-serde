@@ -2638,7 +2638,7 @@ wheels = [
 ]
 
 [[package]]
-name = "py-serde"
+name = "unpack"
 source = { editable = "." }
 
 [package.dev-dependencies]

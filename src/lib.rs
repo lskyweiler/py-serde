@@ -7,7 +7,7 @@ use pyo3_stub_gen::{define_stub_info_gatherer, derive::*};
 
 /// A Python module implemented in Rust.
 #[pymodule]
-mod py_serde {
+mod unpack {
     use super::*;
     use pyo3::{exceptions::PyValueError, types::PyDict};
 
@@ -51,7 +51,7 @@ mod py_serde {
     }
     /// Constructs a single python object from a PyImport dictionary
     ///
-    /// Equivalent to ```py_serde.construct_object_json(json.loads(json_str))```
+    /// Equivalent to ```unpack.construct_object_json(json.loads(json_str))```
     ///
     /// # Examples
     /// ```json
@@ -89,4 +89,5 @@ define_stub_info_gatherer!(stub_info);
 pub mod prelude {
     use super::*;
     pub use py_import_object::{PyImportObject, PyObjectDeserializer};
+    pub use utils::*;
 }

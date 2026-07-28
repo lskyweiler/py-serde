@@ -1,4 +1,4 @@
-import py_serde
+import unpack
 import pydantic
 import dataclasses
 import ipaddress
@@ -20,7 +20,7 @@ class TestDeserialization:
             "object_import": "ipaddress.IPv4Address",
             "data": {"address": "127.0.0.1"},
         }
-        constructed = py_serde.construct_object(obj)
+        constructed = unpack.construct_object(obj)
         assert isinstance(constructed, ipaddress.IPv4Address)
         assert str(constructed) == "127.0.0.1"
 
@@ -29,7 +29,7 @@ class TestDeserialization:
             "object_import": "test_deserialize.Foo",
             "data": {"a": 500, "b": [5.0, 6.0]},
         }
-        constructed = py_serde.construct_object(obj)
+        constructed = unpack.construct_object(obj)
         assert isinstance(constructed, Foo)
         assert constructed.a == 500
         assert constructed.b == [5.0, 6.0]
@@ -39,6 +39,6 @@ class TestDeserialization:
             "object_import": "test_deserialize.FooPydantic",
             "data": {"foo": {"a": 500, "b": [7.0, 8.0]}},
         }
-        constructed = py_serde.construct_object(obj)
+        constructed = unpack.construct_object(obj)
         assert isinstance(constructed, FooPydantic)
         assert isinstance(constructed.foo, Foo)
