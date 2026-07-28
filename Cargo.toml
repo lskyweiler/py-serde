@@ -10,7 +10,7 @@ homepage = "https://github.com/lskyweiler/unpack"
 repository = "https://github.com/lskyweiler/unpack"
 readme = "README.md"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+# Name differs from python-side to be more explict in rust
 [lib]
 name = "py_unpack"
 crate-type = ["cdylib", "rlib"]

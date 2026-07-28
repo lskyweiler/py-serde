@@ -344,9 +344,11 @@ class Foo:
             }"#;
             let py_obj =
                 PyImportObject::from_serde_json_str(py, json_str, PyImportConfig::default())
-                    .unwrap();
+                    .expect("Failed to deserialize");
 
-            let actual = py_obj.try_construct_object().expect("Unable to deserialize");
+            let actual = py_obj
+                .try_construct_object()
+                .expect("Unable to recursively construct object");
             let actual_type = actual.get_type();
             assert_eq!(actual_type.name().unwrap(), "Foo");
         });
