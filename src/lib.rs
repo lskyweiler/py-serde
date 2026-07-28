@@ -90,4 +90,5 @@ define_stub_info_gatherer!(stub_info);
 pub mod prelude {
     use super::*;
     pub use py_import_object::{EntryPoint, PyImportObject, PyImportType, PyObjectDeserializer};
+    pub use py_import_config::PyImportConfig;
 }

@@ -1,7 +1,7 @@
 [package]
 name = "py-unpack"
 authors = ["Lucas Weiler <lucas.l.weiler@leidos.com>"]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "Generic python object deserialization written in rust"
 keywords = ["deserialization", "utilities"]
