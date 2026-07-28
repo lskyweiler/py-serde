@@ -7,8 +7,8 @@ pub const DEFAULT_OBJ_ENTRY_POINT_KEY: &str = "object_entry_point";
 pub const DEFAULT_DATA_POINT_KEY: &str = "data";
 
 #[derive(Clone)]
-#[pyclass]
 #[gen_stub_pyclass]
+#[pyclass]
 pub struct PyImportConfig {
     /// Apply this entry point to all objects that do not define their own
     #[pyo3(get, set)]
@@ -35,6 +35,7 @@ impl Default for PyImportConfig {
         }
     }
 }
+#[gen_stub_pymethods]
 #[pymethods]
 impl PyImportConfig {
     #[new]

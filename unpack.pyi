@@ -11,9 +11,49 @@ __all__ = [
 
 @typing.final
 class PyImportConfig:
-    ...
+    @property
+    def entry_point_group(self) -> builtins.str:
+        r"""
+        Apply this entry point to all objects that do not define their own
+        """
+    @entry_point_group.setter
+    def entry_point_group(self, value: builtins.str) -> None:
+        r"""
+        Apply this entry point to all objects that do not define their own
+        """
+    @property
+    def object_import_key(self) -> builtins.str:
+        r"""
+        Use this key to pull out the object's optional import path
+        """
+    @object_import_key.setter
+    def object_import_key(self, value: builtins.str) -> None:
+        r"""
+        Use this key to pull out the object's optional import path
+        """
+    @property
+    def object_entry_point_key(self) -> builtins.str:
+        r"""
+        Use this key to pull out the object's optional entry point
+        """
+    @object_entry_point_key.setter
+    def object_entry_point_key(self, value: builtins.str) -> None:
+        r"""
+        Use this key to pull out the object's optional entry point
+        """
+    @property
+    def data_key(self) -> builtins.str:
+        r"""
+        Key to use to grab data from. Used as Object(**kwargs)
+        """
+    @data_key.setter
+    def data_key(self, value: builtins.str) -> None:
+        r"""
+        Key to use to grab data from. Used as Object(**kwargs)
+        """
+    def __new__(cls, entry_point_group: builtins.str = ..., object_import_key: builtins.str = ..., object_entry_point_key: builtins.str = ..., data_key: builtins.str = ...) -> PyImportConfig: ...
 
-def construct_object(object_dict: dict, config: typing.Optional[PyImportConfig]) -> typing.Any:
+def construct_object(object_dict: dict, config: typing.Optional[PyImportConfig] = None) -> typing.Any:
     r"""
     Constructs a single python object from a PyImport dictionary
     
@@ -40,7 +80,7 @@ def construct_object(object_dict: dict, config: typing.Optional[PyImportConfig])
     ```
     """
 
-def construct_object_json(object_json_str: builtins.str, config: typing.Optional[PyImportConfig]) -> typing.Any:
+def construct_object_json(object_json_str: builtins.str, config: typing.Optional[PyImportConfig] = None) -> typing.Any:
     r"""
     Constructs a single python object from a serialized PyImport json string
     

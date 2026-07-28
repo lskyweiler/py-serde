@@ -32,8 +32,8 @@ mod unpack {
     ///     }
     /// }
     /// ```
-    #[pyfunction]
     #[gen_stub_pyfunction]
+    #[pyfunction]
     #[pyo3(signature = (object_json_str, config = None))]
     fn construct_object_json<'py>(
         py: Python<'py>,
@@ -72,8 +72,8 @@ mod unpack {
     ///     }
     /// }
     /// ```
-    #[pyfunction]
     #[gen_stub_pyfunction]
+    #[pyfunction]
     #[pyo3(signature = (object_dict, config = None))]
     fn construct_object<'py>(
         object_dict: Bound<'py, PyDict>,
