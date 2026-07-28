@@ -342,15 +342,13 @@ class Foo:
                 "object_import": "rstest.Foo",
                 "data": {"a": 500, "b": [5.0, 6.0]}
             }"#;
-            Python::attach(|py| {
-                let py_obj =
-                    PyImportObject::from_serde_json_str(py, json_str, PyImportConfig::default())
-                        .unwrap();
+            let py_obj =
+                PyImportObject::from_serde_json_str(py, json_str, PyImportConfig::default())
+                    .unwrap();
 
-                let actual = py_obj.try_construct_object().unwrap();
-                let actual_type = actual.get_type();
-                assert_eq!(actual_type.name().unwrap(), "Foo");
-            });
+            let actual = py_obj.try_construct_object().expect("Unable to deserialize");
+            let actual_type = actual.get_type();
+            assert_eq!(actual_type.name().unwrap(), "Foo");
         });
     }
 }

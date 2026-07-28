@@ -8,8 +8,8 @@ use pyo3_stub_gen::define_stub_info_gatherer;
 
 /// A Python module implemented in Rust.
 #[cfg(feature = "build-py-lib")]
-#[pymodule]
-mod unpack {
+#[pymodule(name = "unpack")]
+mod py_unpack {
     use super::*;
     use pyo3::{exceptions::PyValueError, prelude::*, types::PyDict};
     use pyo3_stub_gen::derive::*;

@@ -39,6 +39,7 @@ dev = [
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
+module-name = "unpack"
 
 [tool.ruff]
 extend-exclude = [".venv", "target"]

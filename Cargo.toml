@@ -1,5 +1,5 @@
 [package]
-name = "unpack"
+name = "py-unpack"
 authors = ["Lucas Weiler <lucas.l.weiler@leidos.com>"]
 version = "0.1.0"
 edition = "2024"
@@ -12,7 +12,7 @@ readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
-name = "unpack"
+name = "py_unpack"
 crate-type = ["cdylib", "rlib"]
 doctest = false
 
