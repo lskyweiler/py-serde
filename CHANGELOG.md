@@ -1,3 +1,8 @@
+## [0.1.1] - 2026-07-28
+
+### 🐛 Bug Fixes
+
+- Exposed py import config to rust prelude
 ## [0.1.0] - 2026-07-28
 
 ### 🚀 Features
@@ -23,3 +28,4 @@
 ### ⚙️ Miscellaneous Tasks
 
 - Renamed project to unpack
+- *(release)* Prep for release v0.1.0
