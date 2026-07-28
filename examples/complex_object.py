@@ -1,11 +1,5 @@
-# unpack
+from __future__ import annotations
 
-Complete object deserialization, including type information
-
-Can be used as a rust library to deserialize python objects compltely in rust, or as a python library
-
-
-```python
 import dataclasses
 
 import pydantic
@@ -61,5 +55,3 @@ obj = {
 constructed = unpack.construct_object(obj)
 
 print(constructed.__class__.__name__)  # > MyObject
-```
-

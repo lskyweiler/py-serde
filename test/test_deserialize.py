@@ -55,6 +55,20 @@ class TestDeserialization:
 
         assert constructed.foo.b == [7.0, 8.0]
 
+    def test_custom_config(self):
+        obj = {
+            "my_import": "test_deserialize.FooPydantic",
+            "my_data": {"foo": {"a": 500, "b": [7.0, 8.0]}},
+        }
+        constructed = unpack.construct_object(
+            obj,
+            unpack.PyImportConfig(object_import_key="my_import", data_key="my_data"),
+        )
+        assert isinstance(constructed, FooPydantic)
+        assert isinstance(constructed.foo, Foo)
+
+        assert constructed.foo.b == [7.0, 8.0]
+
     def test_complex_recursive(self):
         obj = {
             "object_import": "test_deserialize.MyObject",

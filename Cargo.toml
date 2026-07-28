@@ -29,5 +29,7 @@ strip = true # Automatically strip symbols from the binary.
 
 [features]
 # extension-module makes running the embedded rust python tests difficult since it doesn't link to libpython
-default = ["pyo3/extension-module"]
+default = ["pyo3/extension-module", "build-py-lib"]
 test = ["pyo3/auto-initialize"]
+# Optinally turn off building a python module. Use this if you will bundle this crate into your rust app
+build-py-lib = []

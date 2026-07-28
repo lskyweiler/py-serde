@@ -57,10 +57,8 @@ def construct_object(object_dict: dict, config: typing.Optional[PyImportConfig] 
     r"""
     Constructs a single python object from a PyImport dictionary
     
-    Equivalent to ```unpack.construct_object_json(json.loads(json_str))```
-    
     # Examples
-    ```json
+    ```
     {
         "object_import": "foo.bar.Baz",
         "data": {
@@ -77,6 +75,18 @@ def construct_object(object_dict: dict, config: typing.Optional[PyImportConfig] 
             }
         }
     }
+    ```
+    
+    You can customize the deserialization behavior
+    ```python
+    obj = {
+        "my_import": "foo.Foo",
+        "my_data": {"foo": {"a": 500, "b": [7.0, 8.0]}},
+    }
+    constructed = unpack.construct_object(
+        obj,
+        unpack.PyImportConfig(object_import_key="my_import", data_key="my_data"),
+    )
     ```
     """
 
@@ -84,24 +94,8 @@ def construct_object_json(object_json_str: builtins.str, config: typing.Optional
     r"""
     Constructs a single python object from a serialized PyImport json string
     
-    # Examples
-    ```json
-    {
-        "object_import": "foo.bar.Baz",
-        "data": {
-            "x": 100.0,
-            "complex": {
-                "object_import": "foo.Foo",
-                "data": {"a": [100.0]}
-            },
-            "pydantic_obj": {
-                "a": 100.0,
-                "b": {
-                    "x": 100, "y": 100, "z": 100
-                }
-            }
-        }
-    }
-    ```
+    Equivalent to ```unpack.construct_object(json.loads(json_str))```
+    
+    See [`unpack.construct_object`] for more details
     """
 

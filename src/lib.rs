@@ -2,36 +2,27 @@ mod py_import_config;
 mod py_import_object;
 pub mod utils;
 
-use pyo3::prelude::*;
-use pyo3_stub_gen::{define_stub_info_gatherer, derive::*};
+#[cfg(feature = "build-py-lib")]
+use pyo3::prelude::pymodule;
+use pyo3_stub_gen::define_stub_info_gatherer;
 
 /// A Python module implemented in Rust.
+#[cfg(feature = "build-py-lib")]
 #[pymodule]
 mod unpack {
     use super::*;
-    use pyo3::{exceptions::PyValueError, types::PyDict};
+    use pyo3::{exceptions::PyValueError, prelude::*, types::PyDict};
+    use pyo3_stub_gen::derive::*;
+
+    #[pymodule_export]
+    use super::py_import_config::PyImportConfig;
 
     /// Constructs a single python object from a serialized PyImport json string
     ///
-    /// # Examples
-    /// ```json
-    /// {
-    ///     "object_import": "foo.bar.Baz",
-    ///     "data": {
-    ///         "x": 100.0,
-    ///         "complex": {
-    ///             "object_import": "foo.Foo",
-    ///             "data": {"a": [100.0]}
-    ///         },
-    ///         "pydantic_obj": {
-    ///             "a": 100.0,
-    ///             "b": {
-    ///                 "x": 100, "y": 100, "z": 100
-    ///             }
-    ///         }
-    ///     }
-    /// }
-    /// ```
+    /// Equivalent to ```unpack.construct_object(json.loads(json_str))```
+    /// 
+    /// See [`unpack.construct_object`] for more details
+    /// 
     #[gen_stub_pyfunction]
     #[pyfunction]
     #[pyo3(signature = (object_json_str, config = None))]
@@ -50,11 +41,9 @@ mod unpack {
         }
     }
     /// Constructs a single python object from a PyImport dictionary
-    ///
-    /// Equivalent to ```unpack.construct_object_json(json.loads(json_str))```
-    ///
+    /// 
     /// # Examples
-    /// ```json
+    /// ```
     /// {
     ///     "object_import": "foo.bar.Baz",
     ///     "data": {
@@ -72,6 +61,18 @@ mod unpack {
     ///     }
     /// }
     /// ```
+    /// 
+    /// You can customize the deserialization behavior
+    /// ```python
+    /// obj = {
+    ///     "my_import": "foo.Foo",
+    ///     "my_data": {"foo": {"a": 500, "b": [7.0, 8.0]}},
+    /// }
+    /// constructed = unpack.construct_object(
+    ///     obj,
+    ///     unpack.PyImportConfig(object_import_key="my_import", data_key="my_data"),
+    /// )
+    /// ```
     #[gen_stub_pyfunction]
     #[pyfunction]
     #[pyo3(signature = (object_dict, config = None))]
@@ -88,5 +89,5 @@ define_stub_info_gatherer!(stub_info);
 
 pub mod prelude {
     use super::*;
-    pub use py_import_object::{PyImportObject, PyObjectDeserializer, PyImportType, EntryPoint};
+    pub use py_import_object::{EntryPoint, PyImportObject, PyImportType, PyObjectDeserializer};
 }
