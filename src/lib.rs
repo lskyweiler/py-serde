@@ -16,6 +16,8 @@ mod py_unpack {
 
     #[pymodule_export]
     use super::config::PyImportConfig;
+    #[pymodule_export]
+    use super::config::PyDumpConfig;
 
     /// Constructs a single python object from a serialized PyImport json string
     ///
@@ -85,7 +87,9 @@ mod py_unpack {
         import_obj.try_construct_object()
     }
 
-    /// Recursively dumps all public (non leading _) members to a json-able dict
+    /// Recursively dumps all members to a json-able dict
+    /// 
+    /// Defaults to ignoring private members (any member that is prefixed with _)
     #[gen_stub_pyfunction]
     #[pyfunction]
     #[pyo3(signature = (object, config = None))]
@@ -98,6 +102,8 @@ mod py_unpack {
     /// Dump an object to a PythonImportObject json string
     /// Equivalent to
     /// `json.dumps(dump_object(obj))`
+    /// 
+    /// Defaults to ignoring private members (any member that is prefixed with _)
     #[gen_stub_pyfunction]
     #[pyfunction]
     #[pyo3(signature = (object, config = None, pretty=false))]

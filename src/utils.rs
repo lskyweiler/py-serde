@@ -96,10 +96,9 @@ pub fn is_instance_of_imported_class<'py>(
     cls_name: &str,
 ) -> PyResult<bool> {
     let py = py_obj.py();
-    // If pydantic is not a module, it can never be a pydantic baseclass
     match py.import(module) {
-        Ok(pydantic_mod) => {
-            let baseclass = pydantic_mod.getattr(cls_name)?;
+        Ok(module) => {
+            let baseclass = module.getattr(cls_name)?;
             py_obj.is_instance(&baseclass)
         }
         Err(_) => Ok(false),
@@ -111,7 +110,28 @@ pub fn is_pydantic_baseclass<'py>(py_obj: &Bound<'py, PyAny>) -> PyResult<bool> 
     is_instance_of_imported_class(py_obj, "pydantic", "BaseModel")
 }
 pub fn is_enum<'py>(py_obj: &Bound<'py, PyAny>) -> PyResult<bool> {
-    is_instance_of_imported_class(py_obj, "enum", "Enum")
+    let py = py_obj.py();
+    let enum_mod = py.import("enum")?;
+    let enum_type = enum_mod.getattr("Enum")?;
+    // Enum vs Enum.a
+    /*
+    ```
+    class MyEnum(enum.Enum):
+        a = 1
+    
+    isinstance(MyEnum, enum.Enum) #> False
+    isinstance(MyEnum.a, enum.Enum) #> True
+    issubclass(MyEnum, enum.Enum) #> True
+    ```
+     */
+    if py_obj.cast::<PyType>().is_ok() {
+        let is_subclass = py.import("builtins")?.getattr("issubclass")?;
+        let out = is_subclass.call1((py_obj, enum_type))?;
+        out.extract()
+    }
+    else {
+        py_obj.is_instance(&enum_type)
+    }
 }
 
 /// Loads python code as a module and adds it to the sys modules

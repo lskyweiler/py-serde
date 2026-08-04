@@ -226,11 +226,23 @@ impl<'py> PyImportObject<'py> {
         }
     }
 
+    /// Tries to construct this object recursively, importing all objects down the tree
     pub fn try_construct_object(&self) -> PyResult<Bound<'py, PyAny>> {
         let class_type = self.get_object_type()?;
 
         if utils::is_pydantic_baseclass(&class_type)? {
             class_type.call_method1("model_validate", (self.data.clone(),))
+        } else if utils::is_enum(&class_type)? {
+            // enums are special since they cant be instantiated with a normal obj()
+            if let Some(name) = self.data.get_item("name")? {
+                class_type.call_method1("__getitem__", (name,))
+            } else if let Some(value) = self.data.get_item("value")? {
+                class_type.call1((value,))
+            } else {
+                return Err(PyValueError::new_err(
+                    "Enums require either a value or name to instantiate",
+                ));
+            }
         } else {
             // Class(**kwargs)
             let de_data =
@@ -239,6 +251,7 @@ impl<'py> PyImportObject<'py> {
         }
     }
 
+    /// Instantiate this object from a json string without constructing the python objects recursively
     pub fn from_serde_json_str(
         py: Python<'py>,
         data: &str,
@@ -286,7 +299,8 @@ fn recursive_deserialize_import_dict<'py>(
     }
 }
 
-/// Recursively serialize any python object
+/// Recursively serialize any python object into a PyImportDict
+/// Note that currently, this loses entry point information
 pub fn recursive_serialize_py_object<'py>(
     value: Bound<'py, PyAny>,
     config: &PyDumpConfig,
@@ -303,12 +317,30 @@ pub fn recursive_serialize_py_object<'py>(
         return Ok(r_val.into_any());
     }
 
-    if utils::is_enum(&value.get_type())? {
+    /*
+    ```
+    class MyEnum(enum.Enum):
+        a = 1
+
+    isinstance(MyEnum.a, enum.Enum) #> True
+    isinstance(type(MyEnum.a), enum.Enum)  #> False
+    ```
+     */
+    if utils::is_enum(&value)? {
+        let r_dict = PyDict::new(value.py());
+
+        let data = PyDict::new(value.py());
         if config.use_enum_name {
-            return Ok(value.getattr("name")?);
+            data.set_item("name", value.getattr("name")?)?;
         } else {
-            return Ok(value.getattr("value")?);
-        }
+            data.set_item("value", value.getattr("value")?)?;
+        };
+
+        r_dict.set_item(&config.data_key, data)?;
+        let import_path = utils::get_obj_import_path(&value.get_type())?;
+        r_dict.set_item(&config.object_import_key, import_path)?;
+
+        return Ok(r_dict.into_any());
     }
 
     if value.is_instance_of::<PyList>()
