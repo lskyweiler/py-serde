@@ -1,100 +1,140 @@
-use crate::{py_import_config::PyImportConfig, utils};
-use pyo3::{exceptions::PyKeyError, prelude::*, types::*};
+use crate::{config::*, utils};
+use pyo3::{
+    exceptions::{PyKeyError, PyValueError},
+    prelude::*,
+    types::*,
+};
 use serde::de::DeserializeSeed;
 
 /// Module to handle serializing and deserializing PyImportObjects. This is in this file to avoid circular imports
 mod py_obj_serde {
     use super::*;
     use crate::utils;
-    use serde::de::{Deserializer, Error, Visitor};
 
-    /// Serialize a single PyImportDict into a Py<PyAny> object
-    pub struct PyObjectDeserializer<'py> {
-        py: Python<'py>,
-        py_import_cfg: PyImportConfig,
-    }
-    impl<'py> PyObjectDeserializer<'py> {
-        pub fn new(py: Python<'py>, py_import_cfg: PyImportConfig) -> Self {
-            Self { py, py_import_cfg }
-        }
-    }
-    impl<'py, 'de> DeserializeSeed<'de> for PyObjectDeserializer<'py> {
-        type Value = PyImportObject<'py>;
+    /// Deserialize
+    pub mod de {
+        use super::*;
+        use serde::de::*;
 
-        fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-        where
-            D: Deserializer<'de>,
-        {
-            deserializer.deserialize_map(PyObjectVisitor {
-                py: self.py,
-                py_import_cfg: self.py_import_cfg,
-            })
+        /// Serialize a single PyImportDict into a Py<PyAny> object
+        pub struct PyObjectDeserializer<'py> {
+            py: Python<'py>,
+            py_import_cfg: PyImportConfig,
         }
-    }
-    struct PyObjectVisitor<'py> {
-        py: Python<'py>,
-        py_import_cfg: PyImportConfig,
-    }
-    impl<'py, 'de> Visitor<'de> for PyObjectVisitor<'py> {
-        type Value = PyImportObject<'py>;
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str("PyImportDict")
+        impl<'py> PyObjectDeserializer<'py> {
+            pub fn new(py: Python<'py>, py_import_cfg: PyImportConfig) -> Self {
+                Self { py, py_import_cfg }
+            }
         }
-        fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-        where
-            A: serde::de::MapAccess<'de>,
-        {
-            let mut import: Option<String> = None;
-            let mut data: Option<Bound<'py, PyDict>> = None;
-            let mut entry_point: Option<EntryPoint> = None;
-            while let Some(key) = map.next_key::<String>()? {
-                match key {
-                    val if val == self.py_import_cfg.object_import_key => {
-                        import = Some(map.next_value::<String>()?)
-                    }
-                    val if val == self.py_import_cfg.entry_point_group => {
-                        entry_point = Some(map.next_value::<EntryPoint>()?);
-                    }
-                    val if val == self.py_import_cfg.data_key => {
-                        let val = map.next_value::<serde_json::Value>()?;
-                        data = match utils::json_value_to_py_dict(self.py, val) {
-                            Ok(data) => Some(data),
-                            Err(what) => return Err(A::Error::custom(format!("{:?}", what))),
-                        };
-                    }
-                    val => {
-                        return Err(A::Error::custom(format!(
-                            "Got unknown field in PyImport dict {}",
-                            val
-                        )));
+        impl<'py, 'de> DeserializeSeed<'de> for PyObjectDeserializer<'py> {
+            type Value = PyImportObject<'py>;
+
+            fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+            where
+                D: Deserializer<'de>,
+            {
+                deserializer.deserialize_map(PyObjectVisitor {
+                    py: self.py,
+                    py_import_cfg: self.py_import_cfg,
+                })
+            }
+        }
+        struct PyObjectVisitor<'py> {
+            py: Python<'py>,
+            py_import_cfg: PyImportConfig,
+        }
+        impl<'py, 'de> Visitor<'de> for PyObjectVisitor<'py> {
+            type Value = PyImportObject<'py>;
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("PyImportDict")
+            }
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::MapAccess<'de>,
+            {
+                let mut import: Option<String> = None;
+                let mut data: Option<Bound<'py, PyDict>> = None;
+                let mut entry_point: Option<EntryPoint> = None;
+                while let Some(key) = map.next_key::<String>()? {
+                    match key {
+                        val if val == self.py_import_cfg.object_import_key => {
+                            import = Some(map.next_value::<String>()?)
+                        }
+                        val if val == self.py_import_cfg.entry_point_group => {
+                            entry_point = Some(map.next_value::<EntryPoint>()?);
+                        }
+                        val if val == self.py_import_cfg.data_key => {
+                            let val = map.next_value::<serde_json::Value>()?;
+                            data = match utils::serde_value_to_py_dict(self.py, val) {
+                                Ok(data) => Some(data),
+                                Err(what) => return Err(A::Error::custom(format!("{:?}", what))),
+                            };
+                        }
+                        val => {
+                            return Err(A::Error::custom(format!(
+                                "Got unknown field in PyImport dict {}",
+                                val
+                            )));
+                        }
                     }
                 }
-            }
 
-            if data.is_none() {
-                return Err(A::Error::custom(
-                    "Data must be defined in the python import dict",
-                ));
-            }
-
-            match PyImportType::from_either(import, entry_point) {
-                Some(py_imp) => Ok(PyImportObject::new(
-                    py_imp,
-                    self.py_import_cfg,
-                    data.unwrap(),
-                )),
-                None => {
+                if data.is_none() {
                     return Err(A::Error::custom(
-                        "An object import or object entry_point must be dfined. But not both",
+                        "Data must be defined in the python import dict",
                     ));
                 }
+
+                match PyImportType::from_either(import, entry_point) {
+                    Some(py_imp) => Ok(PyImportObject::new(
+                        py_imp,
+                        self.py_import_cfg,
+                        data.unwrap(),
+                    )),
+                    None => {
+                        return Err(A::Error::custom(
+                            "An object import or object entry_point must be dfined. But not both",
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    /// Serialize
+    pub mod ser {
+        use super::*;
+        use serde::ser::*;
+
+        pub struct PyObjectSerializer<'py> {
+            obj: Bound<'py, PyDict>,
+        }
+        impl<'py> PyObjectSerializer<'py> {
+            pub fn new(obj: Bound<'py, PyAny>, config: PyDumpConfig) -> PyResult<Self> {
+                let json_able_obj_dump: Bound<'py, PyDict> =
+                    recursive_serialize_py_object(obj, &config)?.extract()?;
+                Ok(Self {
+                    obj: json_able_obj_dump,
+                })
+            }
+        }
+        impl<'a> Serialize for PyObjectSerializer<'a> {
+            fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                let mut s = serializer.serialize_struct("PyObject", 2)?;
+                let value = utils::py_dict_to_serde_value(&self.obj)
+                    .map_err(|e| S::Error::custom(format!("{:?}", e)))?;
+                s.serialize_field(DEFAULT_DATA_KEY, &value)?;
+                s.end()
             }
         }
     }
 }
 
 // re-export
-pub use py_obj_serde::PyObjectDeserializer;
+pub use py_obj_serde::{de::PyObjectDeserializer, ser::PyObjectSerializer};
 
 #[derive(Clone, serde::Deserialize, serde::Serialize)]
 pub struct EntryPoint {
@@ -205,7 +245,7 @@ impl<'py> PyImportObject<'py> {
         cfg: PyImportConfig,
     ) -> Result<Self, serde_json::Error> {
         let mut de = serde_json::de::Deserializer::from_str(data);
-        let py_obj_de = py_obj_serde::PyObjectDeserializer::new(py, cfg);
+        let py_obj_de = py_obj_serde::de::PyObjectDeserializer::new(py, cfg);
         py_obj_de.deserialize(&mut de)
     }
 }
@@ -246,10 +286,95 @@ fn recursive_deserialize_import_dict<'py>(
     }
 }
 
+/// Recursively serialize any python object
+pub fn recursive_serialize_py_object<'py>(
+    value: Bound<'py, PyAny>,
+    config: &PyDumpConfig,
+) -> PyResult<Bound<'py, PyAny>> {
+    if utils::is_pydantic_baseclass(&value.get_type())? {
+        let kwargs = PyDict::new(value.py());
+        kwargs.set_item("mode", "json")?;
+        let data = value.call_method("model_dump", (), Some(&kwargs))?;
+
+        let import_path = utils::get_obj_import_path(&value.get_type())?;
+        let r_val = PyDict::new(value.py());
+        r_val.set_item(&config.data_key, data)?;
+        r_val.set_item(&config.object_import_key, import_path)?;
+        return Ok(r_val.into_any());
+    }
+
+    if utils::is_enum(&value.get_type())? {
+        if config.use_enum_name {
+            return Ok(value.getattr("name")?);
+        } else {
+            return Ok(value.getattr("value")?);
+        }
+    }
+
+    if value.is_instance_of::<PyList>()
+        || value.is_instance_of::<PyTuple>()
+        || value.is_instance_of::<PySet>()
+    {
+        let r_list = PyList::empty(value.py());
+        for v in value.try_iter()? {
+            r_list.append(recursive_serialize_py_object(v.unwrap(), config)?)?;
+        }
+        return Ok(r_list.into_any());
+    }
+    if value.is_instance_of::<PyDict>() {
+        let r_dict = PyDict::new(value.py());
+        for (k, v) in value.cast_into::<PyDict>()?.iter() {
+            let s_k = recursive_serialize_py_object(k, config)?;
+            let s_v = recursive_serialize_py_object(v, config)?;
+            r_dict.set_item(s_k, s_v)?;
+        }
+        return Ok(r_dict.into_any());
+    }
+    if value.hasattr("__dict__")? {
+        let members = value.getattr("__dict__")?.cast_into::<PyDict>()?;
+
+        let data = PyDict::new(value.py());
+        for (k, v) in members.iter() {
+            let name: String = k.extract()?;
+            if name.starts_with("_") && !config.dump_privates {
+                continue;
+            }
+            let s_k = recursive_serialize_py_object(k, config)?;
+            let s_v = recursive_serialize_py_object(v, config)?;
+            data.set_item(s_k, s_v)?;
+        }
+        let r_dict = PyDict::new(value.py());
+        r_dict.set_item(&config.data_key, data)?;
+        let import_path = utils::get_obj_import_path(&value.get_type())?;
+        r_dict.set_item(&config.object_import_key, import_path)?;
+
+        return Ok(r_dict.into_any());
+    }
+    if value.is_instance_of::<PyFloat>()
+        || value.is_instance_of::<PyInt>()
+        || value.is_instance_of::<PyString>()
+        || value.is_instance_of::<PyBool>()
+        || value.is_none()
+    {
+        return Ok(value);
+    }
+
+    // If we get here, all other things have failed. Either just cast to a string or return error
+    if config.never_fail {
+        let cast_string = PyString::new(value.py(), &value.to_string());
+        Ok(cast_string.into_any())
+    } else {
+        Err(PyValueError::new_err(format!(
+            "Could not serialize object {} and never_fail was false",
+            value.get_type().name()?
+        )))
+    }
+}
+
 #[cfg(test)]
 mod test_py_object_import {
     use super::*;
-    use crate::py_import_config;
+    use crate::config;
 
     #[test]
     fn test_simple_deserde() {
@@ -264,7 +389,7 @@ mod test_py_object_import {
             let py_obj = PyImportObject::from_serde_json_str(
                 py,
                 json_str,
-                py_import_config::PyImportConfig::default(),
+                config::PyImportConfig::default(),
             )
             .unwrap();
 
@@ -289,7 +414,7 @@ mod test_py_object_import {
             let py_obj = PyImportObject::from_serde_json_str(
                 py,
                 json_str,
-                py_import_config::PyImportConfig::default(),
+                config::PyImportConfig::default(),
             )
             .unwrap();
 

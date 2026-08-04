@@ -1,6 +1,6 @@
 # unpack
 
-Complete object deserialization, including type information
+Complete object deserialization, including reflected type information needed to fully reconstruct the object.
 
 Can be used as a rust library to deserialize python objects compltely in rust, or as a python library
 

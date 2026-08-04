@@ -4,13 +4,76 @@
 import builtins
 import typing
 __all__ = [
+    "PyDumpConfig",
     "PyImportConfig",
     "construct_object",
     "construct_object_json",
+    "dump_object",
+    "dump_object_json",
 ]
 
 @typing.final
+class PyDumpConfig:
+    r"""
+    Configures the behavior when serializing a python object
+    """
+    @property
+    def object_import_key(self) -> builtins.str:
+        r"""
+        Use this key to pull out the object's optional import path
+        """
+    @object_import_key.setter
+    def object_import_key(self, value: builtins.str) -> None:
+        r"""
+        Use this key to pull out the object's optional import path
+        """
+    @property
+    def data_key(self) -> builtins.str:
+        r"""
+        Key to use to grab data from. Used as Object(**kwargs)
+        """
+    @data_key.setter
+    def data_key(self, value: builtins.str) -> None:
+        r"""
+        Key to use to grab data from. Used as Object(**kwargs)
+        """
+    @property
+    def dump_privates(self) -> builtins.bool:
+        r"""
+        Allow dumping of private members (leading _)
+        """
+    @dump_privates.setter
+    def dump_privates(self, value: builtins.bool) -> None:
+        r"""
+        Allow dumping of private members (leading _)
+        """
+    @property
+    def never_fail(self) -> builtins.bool:
+        r"""
+        Never fail serializing an object. Will always be able to cast object to a string
+        """
+    @never_fail.setter
+    def never_fail(self, value: builtins.bool) -> None:
+        r"""
+        Never fail serializing an object. Will always be able to cast object to a string
+        """
+    @property
+    def use_enum_name(self) -> builtins.bool:
+        r"""
+        Dump enum.name instead of enum.value
+        """
+    @use_enum_name.setter
+    def use_enum_name(self, value: builtins.bool) -> None:
+        r"""
+        Dump enum.name instead of enum.value
+        """
+    def __new__(cls, object_import_key: builtins.str = ..., data_key: builtins.str = ..., never_fail: builtins.bool = ..., dump_privates: builtins.bool = ..., use_enum_name: builtins.bool = ...) -> PyDumpConfig: ...
+
+@typing.final
 class PyImportConfig:
+    r"""
+    Configures the behavior when loading a python object
+    """
     @property
     def entry_point_group(self) -> builtins.str:
         r"""
@@ -97,5 +160,17 @@ def construct_object_json(object_json_str: builtins.str, config: typing.Optional
     Equivalent to ```unpack.construct_object(json.loads(json_str))```
     
     See [`unpack.construct_object`] for more details
+    """
+
+def dump_object(object: typing.Any, config: typing.Optional[PyDumpConfig] = None) -> typing.Any:
+    r"""
+    Recursively dumps all public (non leading _) members to a json-able dict
+    """
+
+def dump_object_json(object: typing.Any, config: typing.Optional[PyDumpConfig] = None, pretty: builtins.bool = ...) -> builtins.str:
+    r"""
+    Dump an object to a PythonImportObject json string
+    Equivalent to
+    `json.dumps(dump_object(obj))`
     """
 
