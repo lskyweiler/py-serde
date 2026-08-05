@@ -104,7 +104,6 @@ mod py_obj_serde {
     /// Serialize
     pub mod ser {
         use super::*;
-        use serde::ser::*;
 
         pub struct PyObjectSerializer<'py> {
             obj: Bound<'py, PyDict>,
@@ -117,17 +116,10 @@ mod py_obj_serde {
                     obj: json_able_obj_dump,
                 })
             }
-        }
-        impl<'a> Serialize for PyObjectSerializer<'a> {
-            fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-            where
-                S: serde::Serializer,
-            {
-                let mut s = serializer.serialize_struct("PyObject", 2)?;
-                let value = utils::py_dict_to_serde_value(&self.obj)
-                    .map_err(|e| S::Error::custom(format!("{:?}", e)))?;
-                s.serialize_field(DEFAULT_DATA_KEY, &value)?;
-                s.end()
+
+            /// Convert the python object to a serde_json value
+            pub fn to_serde_value(&self) -> PyResult<serde_json::Value> {
+                utils::py_dict_to_serde_value(&self.obj)
             }
         }
     }
