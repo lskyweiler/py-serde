@@ -1290,5 +1290,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b"
 
 [[patch.unused]]
+name = "map3d"
+version = "0.7.0"
+
+[[patch.unused]]
 name = "pyglam"
 version = "0.3.0"
+
+[[patch.unused]]
+name = "simple-py-bevy"
+version = "0.6.0"

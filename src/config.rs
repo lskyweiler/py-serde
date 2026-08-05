@@ -9,7 +9,7 @@ pub const DEFAULT_DATA_KEY: &str = "data";
 /// Configures the behavior when loading a python object
 #[derive(Clone)]
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "unpack")]
 pub struct PyImportConfig {
     /// Apply this entry point to all objects that do not define their own
     #[pyo3(get, set)]
@@ -66,7 +66,7 @@ impl PyImportConfig {
 /// Configures the behavior when serializing a python object
 #[derive(Clone)]
 #[gen_stub_pyclass]
-#[pyclass]
+#[pyclass(module = "unpack")]
 pub struct PyDumpConfig {
     /// Use this key to pull out the object's optional import path
     #[pyo3(get, set)]
