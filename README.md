@@ -1,6 +1,6 @@
 # unpack
 
-Complete object deserialization, including reflected type information needed to fully reconstruct the object.
+Complete object deserialization, including reflected type information needed to fully reconstruct the object. Basically a `pickle` for json
 
 This was originally developed as a way to embed serialized python objects inside a rust configuration system, but can be used from python
 

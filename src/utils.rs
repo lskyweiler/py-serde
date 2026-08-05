@@ -107,8 +107,7 @@ pub fn is_instance_or_subclass<'py>(
         } else {
             py_obj.is_instance(&cls)
         }
-    }
-    else {
+    } else {
         Ok(false)
     }
 }
@@ -168,14 +167,19 @@ pub fn add_python_module_from_code<'py>(
 /// get_obj_import_path(Foo) #> foo.Foo
 /// ```
 pub fn get_obj_import_path<'py>(py_obj: &Bound<'py, PyType>) -> PyResult<String> {
-    let inspect_mod = py_obj.py().import("inspect")?;
+    if py_obj.hasattr("__module__")? {
+        let module: String = py_obj.getattr("__module__")?.extract()?;
+        Ok(format!("{}.{}", module, py_obj.name()?))
+    } else {
+        let inspect_mod = py_obj.py().import("inspect")?;
 
-    // Access a function from the imported module
-    let get_module_callable = inspect_mod.getattr("getmodule")?;
-    let fn_module = get_module_callable.call1((py_obj,))?;
-    let fn_module_name = fn_module.getattr("__name__")?.to_string();
+        // Access a function from the imported module
+        let get_module_callable = inspect_mod.getattr("getmodule")?;
+        let fn_module = get_module_callable.call1((py_obj,))?;
+        let fn_module_name = fn_module.getattr("__name__")?.to_string();
 
-    Ok(format!("{}.{}", fn_module_name, py_obj.name()?))
+        Ok(format!("{}.{}", fn_module_name, py_obj.name()?))
+    }
 }
 
 #[cfg(test)]
