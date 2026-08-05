@@ -56,7 +56,7 @@ mod py_obj_serde {
                 A: serde::de::MapAccess<'de>,
             {
                 let mut import: Option<String> = None;
-                let mut data: Option<Bound<'py, PyDict>> = None;
+                let mut data: Option<Bound<'py, PyAny>> = None;
                 let mut entry_point: Option<EntryPoint> = None;
                 while let Some(key) = map.next_key::<String>()? {
                     match key {
@@ -68,7 +68,7 @@ mod py_obj_serde {
                         }
                         val if val == self.py_import_cfg.data_key => {
                             let val = map.next_value::<serde_json::Value>()?;
-                            data = match utils::serde_value_to_py_dict(self.py, val) {
+                            data = match utils::serde_value_to_py_any(self.py, val) {
                                 Ok(data) => Some(data),
                                 Err(what) => return Err(A::Error::custom(format!("{:?}", what))),
                             };
@@ -156,10 +156,10 @@ impl PyImportType {
 pub struct PyImportObject<'py> {
     import_type: PyImportType,
     config: PyImportConfig,
-    data: Bound<'py, PyDict>,
+    data: Bound<'py, PyAny>,
 }
 impl<'py> PyImportObject<'py> {
-    pub fn new(import_type: PyImportType, cfg: PyImportConfig, data: Bound<'py, PyDict>) -> Self {
+    pub fn new(import_type: PyImportType, cfg: PyImportConfig, data: Bound<'py, PyAny>) -> Self {
         Self {
             import_type,
             data,
@@ -230,10 +230,11 @@ impl<'py> PyImportObject<'py> {
         } else if utils::is_pydantic_baseclass(&class_type)? {
             class_type.call_method1("model_validate", (self.data.clone(),))
         } else if utils::is_enum(&class_type)? {
+            let dict = self.data.cast::<PyDict>()?;
             // enums are special since they cant be instantiated with a normal obj()
-            if let Some(name) = self.data.get_item("name")? {
+            if let Some(name) = dict.get_item("name")? {
                 class_type.call_method1("__getitem__", (name,))
-            } else if let Some(value) = self.data.get_item("value")? {
+            } else if let Some(value) = dict.get_item("value")? {
                 class_type.call1((value,))
             } else {
                 return Err(PyValueError::new_err(
@@ -242,21 +243,9 @@ impl<'py> PyImportObject<'py> {
             }
         } else if utils::is_pathlib(&class_type)? {
             // pathlibs are special since they can either be a Posix or Windows path and they dont take any **kwargs
-            if let Some(path) = self.data.get_item("path")? {
-                class_type.call1((path.clone(),))
-            } else {
-                return Err(PyValueError::new_err(
-                    "Pathlib paths require a path to instantiate",
-                ));
-            }
+            class_type.call1((self.data.clone(),))
         } else if utils::is_datetime(&class_type)? {
-            if let Some(dt) = self.data.get_item("datetime")? {
-                class_type.call_method1("fromisoformat", (dt.clone(),))
-            } else {
-                return Err(PyValueError::new_err(
-                    "Pathlib paths require a path to instantiate",
-                ));
-            }
+            class_type.call_method1("fromisoformat", (self.data.clone(),))
         } else {
             // Class(**kwargs)
             let de_data =
@@ -369,21 +358,15 @@ pub fn recursive_serialize_py_object<'py>(
         let path = value.to_string();
         // Pathlib is complicted where it creates Windows or Posix paths, and we want this to be portable between systems
         r_dict.set_item(&config.object_import_key, "pathlib.Path")?;
-        let data = PyDict::new(value.py());
-        data.set_item("path", path)?;
-        r_dict.set_item(&config.data_key, data)?;
+        r_dict.set_item(&config.data_key, path)?;
 
         return Ok(r_dict.into_any());
     }
     if utils::is_datetime(&value)? {
         let r_dict = PyDict::new(value.py());
-        let path = value.to_string();
         let import_path = utils::get_obj_import_path(&value.get_type())?;
         r_dict.set_item(&config.object_import_key, import_path)?;
-
-        let data = PyDict::new(value.py());
-        data.set_item("datetime", path)?;
-        r_dict.set_item(&config.data_key, data)?;
+        r_dict.set_item(&config.data_key, value.to_string())?;
 
         return Ok(r_dict.into_any());
     }

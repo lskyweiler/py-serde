@@ -145,7 +145,7 @@ class TestSerialize:
 
     def test_pathlib(self):
         actual = unpack.dump_object(MyPathWrap(pathlib.Path(__file__)))
-        assert actual["data"]["fp"]["data"]["path"] == __file__
+        assert actual["data"]["fp"]["data"] == __file__
         assert actual["data"]["fp"]["object_import"] == "pathlib.Path"
 
         actual_constructed = unpack.construct_object(actual)
@@ -154,7 +154,7 @@ class TestSerialize:
     def test_datetime(self):
         dt = datetime.datetime.now()
         actual = unpack.dump_object(MyDatetimeWrap(dt=dt))
-        assert actual["data"]["dt"]["data"]
+        assert actual["data"]["dt"]["data"] == str(dt)
         assert actual["data"]["dt"]["object_import"] == "datetime.datetime"
 
         actual_constructed = unpack.construct_object(actual)

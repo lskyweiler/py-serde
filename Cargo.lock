@@ -1291,4 +1291,4 @@ checksum = "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b"
 
 [[patch.unused]]
 name = "pyglam"
-version = "0.2.2"
+version = "0.3.0"

@@ -7,13 +7,13 @@ use serde_json;
 use std::{ffi::CString, str::FromStr};
 
 /// Converts a serde_json::Value object into a PyDict
-pub fn serde_value_to_py_dict<'py>(
+pub fn serde_value_to_py_any<'py>(
     py: Python<'py>,
     value: serde_json::Value,
-) -> PyResult<Bound<'py, PyDict>> {
+) -> PyResult<Bound<'py, PyAny>> {
     let json_mod = py.import("json")?;
     let loaded_any = json_mod.call_method1("loads", (value.to_string(),))?;
-    let loaded_dict: Bound<'py, PyDict> = loaded_any.extract()?;
+    let loaded_dict: Bound<'py, PyAny> = loaded_any.extract()?;
 
     Ok(loaded_dict)
 }
