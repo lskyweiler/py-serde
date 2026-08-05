@@ -243,6 +243,23 @@ impl<'py> PyImportObject<'py> {
                     "Enums require either a value or name to instantiate",
                 ));
             }
+        } else if utils::is_pathlib(&class_type)? {
+            // pathlibs are special since they can either be a Posix or Windows path and they dont take any **kwargs
+            if let Some(path) = self.data.get_item("path")? {
+                class_type.call1((path.clone(),))
+            } else {
+                return Err(PyValueError::new_err(
+                    "Pathlib paths require a path to instantiate",
+                ));
+            }
+        } else if utils::is_datetime(&class_type)? {
+            if let Some(dt) = self.data.get_item("datetime")? {
+                class_type.call_method1("fromisoformat", (dt.clone(),))
+            } else {
+                return Err(PyValueError::new_err(
+                    "Pathlib paths require a path to instantiate",
+                ));
+            }
         } else {
             // Class(**kwargs)
             let de_data =
@@ -316,16 +333,6 @@ pub fn recursive_serialize_py_object<'py>(
         r_val.set_item(&config.object_import_key, import_path)?;
         return Ok(r_val.into_any());
     }
-
-    /*
-    ```
-    class MyEnum(enum.Enum):
-        a = 1
-
-    isinstance(MyEnum.a, enum.Enum) #> True
-    isinstance(type(MyEnum.a), enum.Enum)  #> False
-    ```
-     */
     if utils::is_enum(&value)? {
         let r_dict = PyDict::new(value.py());
 
@@ -339,6 +346,29 @@ pub fn recursive_serialize_py_object<'py>(
         r_dict.set_item(&config.data_key, data)?;
         let import_path = utils::get_obj_import_path(&value.get_type())?;
         r_dict.set_item(&config.object_import_key, import_path)?;
+
+        return Ok(r_dict.into_any());
+    }
+    if utils::is_pathlib(&value)? {
+        let r_dict = PyDict::new(value.py());
+        let path = value.to_string();
+        // Pathlib is complicted where it creates Windows or Posix paths, and we want this to be portable between systems
+        r_dict.set_item(&config.object_import_key, "pathlib.Path")?;
+        let data = PyDict::new(value.py());
+        data.set_item("path", path)?;
+        r_dict.set_item(&config.data_key, data)?;
+
+        return Ok(r_dict.into_any());
+    }
+    if utils::is_datetime(&value)? {
+        let r_dict = PyDict::new(value.py());
+        let path = value.to_string();
+        let import_path = utils::get_obj_import_path(&value.get_type())?;
+        r_dict.set_item(&config.object_import_key, import_path)?;
+
+        let data = PyDict::new(value.py());
+        data.set_item("datetime", path)?;
+        r_dict.set_item(&config.data_key, data)?;
 
         return Ok(r_dict.into_any());
     }

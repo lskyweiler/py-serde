@@ -2,7 +2,7 @@
 
 Complete object deserialization, including reflected type information needed to fully reconstruct the object.
 
-Can be used as a rust library to deserialize python objects compltely in rust, or as a python library
+This was originally developed as a way to embed serialized python objects inside a rust configuration system, but can be used from python
 
 ### Python Usage
 ```python
@@ -61,6 +61,35 @@ obj = {
 constructed = unpack.construct_object(obj)
 
 print(constructed.__class__.__name__)  # > MyObject
+
+dumped = unpack.dump_object(constructed)
+#> {
+#>     "object_import": "__main__.MyObject",
+#>     "data": {
+#>         "foo_pydantic": {
+#>             "a": {
+#>                 "object_import": "__main__.FooPydantic",
+#>                 "data": {"foo": {"a": 500, "b": [7.0, 8.0]}},
+#>             },
+#>             "b": {
+#>                 "object_import": "__main__.FooPydantic",
+#>                 "data": {"foo": {"a": -100, "b": [100]}},
+#>             },
+#>         },
+#>         "foos": [
+#>             -10.0,
+#>             {
+#>                 "object_import": "__main__.Foo",
+#>                 "data": {"a": 500, "b": [5.0, 6.0]},
+#>             },
+#>             -150.0,
+#>             {
+#>                 "object_import": "__main__.Foo",
+#>                 "data": {"a": 700.0, "b": [100000.0]},
+#>             },
+#>         ],
+#>     },
+#> }
 ```
 
 
@@ -82,3 +111,15 @@ let actual = py_obj
 let actual_type = actual.get_type();
 assert_eq!(actual_type.name().unwrap(), "Foo");
 ```
+
+## Who is this for?
+
+- If you need a way to serialize complex, heterogenous python objects and recove their type information without any bespoke logic in your models
+    - plugin systems
+    - complex polymorphic data types that you'd need to know the type of to pydantically validate
+- This is **not** a pydantic replacement. This uses pydantic under the hood for validating Pydantic objects
+
+## Considerations
+
+- This will serialize/deserialize simple python objects, but anything complex should be a `pydantic.Baseclass`. This is not intended to reimplement pydantic
+- Normal python objects are not validated, they will recursively be constructed based on their import type, but will not be checked against type hints

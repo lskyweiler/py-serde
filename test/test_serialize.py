@@ -1,6 +1,8 @@
 import dataclasses
 import enum
+import datetime
 import pydantic
+import pathlib
 import unpack
 
 
@@ -28,6 +30,22 @@ class MyEnum(enum.Enum):
 @dataclasses.dataclass
 class FooEnum:
     e: MyEnum
+
+
+@dataclasses.dataclass
+class MyPathWrap:
+    fp: pathlib.Path
+
+
+@dataclasses.dataclass
+class MyDatetimeWrap:
+    dt: datetime.datetime
+
+
+class Private:
+    def __init__(self, a: float):
+        self.a = a
+        self._b = a
 
 
 class TestSerialize:
@@ -78,3 +96,43 @@ class TestSerialize:
         loaded = unpack.construct_object(actual)
         assert isinstance(loaded, FooEnum)
         assert loaded.e == MyEnum.a
+
+    def test_serialize_base_value(self):
+        actual = unpack.dump_object(100.0)
+        assert actual == 100.0
+
+    def test_no_privates(self):
+        actual = unpack.dump_object(
+            Private(a=100.0), unpack.PyDumpConfig(dump_privates=False)
+        )
+        assert actual["data"]["a"] == 100.0
+        assert "_b" not in actual["data"]
+
+    def test_privates(self):
+        class Private:
+            def __init__(self, a: float):
+                self.a = a
+                self._b = a
+
+        actual = unpack.dump_object(
+            Private(a=100.0), unpack.PyDumpConfig(dump_privates=True)
+        )
+        assert actual["data"]["a"] == 100.0
+        assert actual["data"]["_b"] == 100.0
+
+    def test_pathlib(self):
+        actual = unpack.dump_object(MyPathWrap(pathlib.Path(__file__)))
+        assert actual["data"]["fp"]["data"]["path"] == __file__
+        assert actual["data"]["fp"]["object_import"] == "pathlib.Path"
+
+        actual_constructed = unpack.construct_object(actual)
+        assert actual_constructed.fp == pathlib.Path(__file__)
+
+    def test_datetime(self):
+        dt = datetime.datetime.now()
+        actual = unpack.dump_object(MyDatetimeWrap(dt=dt))
+        assert actual["data"]["dt"]["data"]
+        assert actual["data"]["dt"]["object_import"] == "datetime.datetime"
+
+        actual_constructed = unpack.construct_object(actual)
+        assert actual_constructed.dt == dt

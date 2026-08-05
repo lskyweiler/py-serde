@@ -90,48 +90,52 @@ pub fn import_obj_from_entry_point<'py>(
     }
 }
 
-pub fn is_instance_of_imported_class<'py>(
+/// Check if an object (could be a class type or instantiated object) is a concrete instance or a sublcass of a type
+pub fn is_instance_or_subclass<'py>(
     py_obj: &Bound<'py, PyAny>,
     module: &str,
-    cls_name: &str,
+    class: &str,
 ) -> PyResult<bool> {
     let py = py_obj.py();
-    match py.import(module) {
-        Ok(module) => {
-            let baseclass = module.getattr(cls_name)?;
-            py_obj.is_instance(&baseclass)
+    if let Ok(module) = py.import(module) {
+        let cls = module.getattr(class)?;
+
+        if py_obj.cast::<PyType>().is_ok() {
+            let is_subclass = py.import("builtins")?.getattr("issubclass")?;
+            let out = is_subclass.call1((py_obj, cls))?;
+            out.extract()
+        } else {
+            py_obj.is_instance(&cls)
         }
-        Err(_) => Ok(false),
+    }
+    else {
+        Ok(false)
     }
 }
 
 /// Check if a given python object inherits from a pydantic.BaseModel
 pub fn is_pydantic_baseclass<'py>(py_obj: &Bound<'py, PyAny>) -> PyResult<bool> {
-    is_instance_of_imported_class(py_obj, "pydantic", "BaseModel")
+    is_instance_or_subclass(py_obj, "pydantic", "BaseModel")
 }
 pub fn is_enum<'py>(py_obj: &Bound<'py, PyAny>) -> PyResult<bool> {
-    let py = py_obj.py();
-    let enum_mod = py.import("enum")?;
-    let enum_type = enum_mod.getattr("Enum")?;
     // Enum vs Enum.a
     /*
     ```
     class MyEnum(enum.Enum):
         a = 1
-    
+
     isinstance(MyEnum, enum.Enum) #> False
     isinstance(MyEnum.a, enum.Enum) #> True
     issubclass(MyEnum, enum.Enum) #> True
     ```
      */
-    if py_obj.cast::<PyType>().is_ok() {
-        let is_subclass = py.import("builtins")?.getattr("issubclass")?;
-        let out = is_subclass.call1((py_obj, enum_type))?;
-        out.extract()
-    }
-    else {
-        py_obj.is_instance(&enum_type)
-    }
+    is_instance_or_subclass(py_obj, "enum", "Enum")
+}
+pub fn is_pathlib<'py>(py_obj: &Bound<'py, PyAny>) -> PyResult<bool> {
+    is_instance_or_subclass(py_obj, "pathlib", "Path")
+}
+pub fn is_datetime<'py>(py_obj: &Bound<'py, PyAny>) -> PyResult<bool> {
+    is_instance_or_subclass(py_obj, "datetime", "datetime")
 }
 
 /// Loads python code as a module and adds it to the sys modules
