@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import dataclasses
 import enum
 import datetime
@@ -46,6 +48,27 @@ class Private:
     def __init__(self, a: float):
         self.a = a
         self._b = a
+
+
+class CustomUnpack:
+    def __init__(self) -> None:
+        self._x, self._y, self._z = 1, 2, 3
+
+    def __unpack_dump__(self) -> dict:
+        return {"x": self._x, "y": self._y, "z": self._z}
+
+    @staticmethod
+    def __unpack_load__(value: dict) -> CustomUnpack:
+        out = CustomUnpack()
+        out._x = value["x"]
+        out._y = value["y"]
+        out._z = value["z"]
+        return out
+
+
+@dataclasses.dataclass
+class Nested:
+    c: CustomUnpack
 
 
 class TestSerialize:
@@ -136,3 +159,15 @@ class TestSerialize:
 
         actual_constructed = unpack.construct_object(actual)
         assert actual_constructed.dt == dt
+
+    def test_custom(self):
+        actual = unpack.dump_object(CustomUnpack())
+        assert actual["data"] == {"x": 1, "y": 2, "z": 3}
+
+        loaded = unpack.construct_object(actual)
+        assert loaded._x == 1
+        assert loaded._y == 2
+        assert loaded._z == 3
+
+        actual = unpack.dump_object(Nested(c=CustomUnpack()))
+        assert actual["data"]["c"]["data"] == {"x": 1, "y": 2, "z": 3}

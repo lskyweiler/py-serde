@@ -6,6 +6,9 @@ use pyo3::{
 };
 use serde::de::DeserializeSeed;
 
+const UNPACK_SERIALIZE_DUNDER: &str = "__unpack_dump__";
+const UNPACK_DESERIALIZE_DUNDER: &str = "__unpack_load__";
+
 /// Module to handle serializing and deserializing PyImportObjects. This is in this file to avoid circular imports
 mod py_obj_serde {
     use super::*;
@@ -222,7 +225,9 @@ impl<'py> PyImportObject<'py> {
     pub fn try_construct_object(&self) -> PyResult<Bound<'py, PyAny>> {
         let class_type = self.get_object_type()?;
 
-        if utils::is_pydantic_baseclass(&class_type)? {
+        if class_type.hasattr(UNPACK_DESERIALIZE_DUNDER)? {
+            class_type.call_method1(UNPACK_DESERIALIZE_DUNDER, (self.data.clone(),))
+        } else if utils::is_pydantic_baseclass(&class_type)? {
             class_type.call_method1("model_validate", (self.data.clone(),))
         } else if utils::is_enum(&class_type)? {
             // enums are special since they cant be instantiated with a normal obj()
@@ -314,6 +319,24 @@ pub fn recursive_serialize_py_object<'py>(
     value: Bound<'py, PyAny>,
     config: &PyDumpConfig,
 ) -> PyResult<Bound<'py, PyAny>> {
+    // If the class has defined its own custom hook to handle serialization/deserialization
+    /*
+    class MyClass:
+        def __unpack_dump__(self) -> dict:
+            ...
+        @staticmethod
+        def __unpack_load__() -> MyClass:
+            ...
+    */
+    if value.hasattr(UNPACK_SERIALIZE_DUNDER)? {
+        let dumped = value.call_method0(UNPACK_SERIALIZE_DUNDER)?;
+        let r_dict = PyDict::new(value.py());
+        r_dict.set_item(&config.data_key, dumped)?;
+        let import_path = utils::get_obj_import_path(&value.get_type())?;
+        r_dict.set_item(&config.object_import_key, import_path)?;
+        return Ok(r_dict.into_any());
+    }
+
     if utils::is_pydantic_baseclass(&value.get_type())? {
         let kwargs = PyDict::new(value.py());
         kwargs.set_item("mode", "json")?;
@@ -364,7 +387,6 @@ pub fn recursive_serialize_py_object<'py>(
 
         return Ok(r_dict.into_any());
     }
-
     if value.is_instance_of::<PyList>()
         || value.is_instance_of::<PyTuple>()
         || value.is_instance_of::<PySet>()
