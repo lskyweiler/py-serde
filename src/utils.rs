@@ -4,18 +4,28 @@ use pyo3::{
     types::*,
 };
 use serde_json;
-use std::ffi::CString;
+use std::{ffi::CString, str::FromStr};
 
 /// Converts a serde_json::Value object into a PyDict
-pub fn json_value_to_py_dict<'py>(
+pub fn serde_value_to_py_any<'py>(
     py: Python<'py>,
     value: serde_json::Value,
-) -> PyResult<Bound<'py, PyDict>> {
+) -> PyResult<Bound<'py, PyAny>> {
     let json_mod = py.import("json")?;
-    let dumped_any = json_mod.call_method1("loads", (value.to_string(),))?;
-    let dumped_dict: Bound<'py, PyDict> = dumped_any.extract()?;
+    let loaded_any = json_mod.call_method1("loads", (value.to_string(),))?;
+    let loaded_dict: Bound<'py, PyAny> = loaded_any.extract()?;
 
-    Ok(dumped_dict)
+    Ok(loaded_dict)
+}
+/// Converts a json-able python dictionary into a serde_json::Value
+pub fn py_dict_to_serde_value<'py>(obj: &Bound<'py, PyDict>) -> PyResult<serde_json::Value> {
+    let json_mod = obj.py().import("json")?;
+    let dumped_any = json_mod.call_method1("dumps", (obj,))?;
+    let dumped_dict: String = dumped_any.extract()?;
+
+    let serde_value = serde_json::Value::from_str(&dumped_dict)
+        .map_err(|e| PyValueError::new_err(format!("{:?}", e)))?;
+    Ok(serde_value)
 }
 
 /// Import an object from a fully qualified path
@@ -80,17 +90,51 @@ pub fn import_obj_from_entry_point<'py>(
     }
 }
 
+/// Check if an object (could be a class type or instantiated object) is a concrete instance or a sublcass of a type
+pub fn is_instance_or_subclass<'py>(
+    py_obj: &Bound<'py, PyAny>,
+    module: &str,
+    class: &str,
+) -> PyResult<bool> {
+    let py = py_obj.py();
+    if let Ok(module) = py.import(module) {
+        let cls = module.getattr(class)?;
+
+        if py_obj.cast::<PyType>().is_ok() {
+            let is_subclass = py.import("builtins")?.getattr("issubclass")?;
+            let out = is_subclass.call1((py_obj, cls))?;
+            out.extract()
+        } else {
+            py_obj.is_instance(&cls)
+        }
+    } else {
+        Ok(false)
+    }
+}
+
 /// Check if a given python object inherits from a pydantic.BaseModel
 pub fn is_pydantic_baseclass<'py>(py_obj: &Bound<'py, PyAny>) -> PyResult<bool> {
-    let py = py_obj.py();
-    // If pydantic is not a module, it can never be a pydantic baseclass
-    match py.import("pydantic") {
-        Ok(pydantic_mod) => {
-            let baseclass = pydantic_mod.getattr("BaseModel")?;
-            py_obj.is_instance(&baseclass)
-        }
-        Err(_) => Ok(false),
-    }
+    is_instance_or_subclass(py_obj, "pydantic", "BaseModel")
+}
+pub fn is_enum<'py>(py_obj: &Bound<'py, PyAny>) -> PyResult<bool> {
+    // Enum vs Enum.a
+    /*
+    ```
+    class MyEnum(enum.Enum):
+        a = 1
+
+    isinstance(MyEnum, enum.Enum) #> False
+    isinstance(MyEnum.a, enum.Enum) #> True
+    issubclass(MyEnum, enum.Enum) #> True
+    ```
+     */
+    is_instance_or_subclass(py_obj, "enum", "Enum")
+}
+pub fn is_pathlib<'py>(py_obj: &Bound<'py, PyAny>) -> PyResult<bool> {
+    is_instance_or_subclass(py_obj, "pathlib", "Path")
+}
+pub fn is_datetime<'py>(py_obj: &Bound<'py, PyAny>) -> PyResult<bool> {
+    is_instance_or_subclass(py_obj, "datetime", "datetime")
 }
 
 /// Loads python code as a module and adds it to the sys modules
@@ -112,6 +156,30 @@ pub fn add_python_module_from_code<'py>(
     sys_modules.set_item(mod_name, &module)?;
 
     Ok(())
+}
+
+/// Get the fully qualified import path for the object
+/// # Example
+/// ```
+/// #> foo.py
+/// class Foo: ...
+///
+/// get_obj_import_path(Foo) #> foo.Foo
+/// ```
+pub fn get_obj_import_path<'py>(py_obj: &Bound<'py, PyType>) -> PyResult<String> {
+    if py_obj.hasattr("__module__")? {
+        let module: String = py_obj.getattr("__module__")?.extract()?;
+        Ok(format!("{}.{}", module, py_obj.name()?))
+    } else {
+        let inspect_mod = py_obj.py().import("inspect")?;
+
+        // Access a function from the imported module
+        let get_module_callable = inspect_mod.getattr("getmodule")?;
+        let fn_module = get_module_callable.call1((py_obj,))?;
+        let fn_module_name = fn_module.getattr("__name__")?.to_string();
+
+        Ok(format!("{}.{}", fn_module_name, py_obj.name()?))
+    }
 }
 
 #[cfg(test)]
@@ -140,6 +208,27 @@ mod test_utils {
             Python::attach(|py| {
                 let actual = import_obj_from_qual_path(py, "builtins.float").unwrap();
                 assert_eq!(actual.name().unwrap(), "float");
+            });
+        }
+    }
+
+    mod test_obj_import_path {
+        use super::*;
+
+        #[test]
+        fn test_import_path() {
+            Python::attach(|py| {
+                let obj = import_obj_from_qual_path(py, "ipaddress.IPv4Address").unwrap();
+                let actual = get_obj_import_path(&obj).unwrap();
+                assert_eq!(actual, "ipaddress.IPv4Address");
+            });
+        }
+        #[test]
+        fn test_import_builtins() {
+            Python::attach(|py| {
+                let obj = import_obj_from_qual_path(py, "builtins.float").unwrap();
+                let actual = get_obj_import_path(&obj).unwrap();
+                assert_eq!(actual, "builtins.float");
             });
         }
     }

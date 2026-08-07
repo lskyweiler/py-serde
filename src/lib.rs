@@ -1,4 +1,4 @@
-mod py_import_config;
+mod config;
 mod py_import_object;
 pub mod utils;
 
@@ -11,25 +11,27 @@ use pyo3_stub_gen::define_stub_info_gatherer;
 #[pymodule(name = "unpack")]
 mod py_unpack {
     use super::*;
-    use pyo3::{exceptions::PyValueError, prelude::*, types::PyDict};
+    use pyo3::{PyAny, exceptions::PyValueError, prelude::*, types::PyDict};
     use pyo3_stub_gen::derive::*;
 
     #[pymodule_export]
-    use super::py_import_config::PyImportConfig;
+    use super::config::PyImportConfig;
+    #[pymodule_export]
+    use super::config::PyDumpConfig;
 
     /// Constructs a single python object from a serialized PyImport json string
     ///
     /// Equivalent to ```unpack.construct_object(json.loads(json_str))```
-    /// 
+    ///
     /// See [`unpack.construct_object`] for more details
-    /// 
+    ///
     #[gen_stub_pyfunction]
     #[pyfunction]
     #[pyo3(signature = (object_json_str, config = None))]
     fn construct_object_json<'py>(
         py: Python<'py>,
         object_json_str: String,
-        config: Option<py_import_config::PyImportConfig>,
+        config: Option<config::PyImportConfig>,
     ) -> PyResult<Bound<'py, PyAny>> {
         match py_import_object::PyImportObject::from_serde_json_str(
             py,
@@ -41,7 +43,7 @@ mod py_unpack {
         }
     }
     /// Constructs a single python object from a PyImport dictionary
-    /// 
+    ///
     /// # Examples
     /// ```
     /// {
@@ -61,7 +63,7 @@ mod py_unpack {
     ///     }
     /// }
     /// ```
-    /// 
+    ///
     /// You can customize the deserialization behavior
     /// ```python
     /// obj = {
@@ -78,17 +80,55 @@ mod py_unpack {
     #[pyo3(signature = (object_dict, config = None))]
     fn construct_object<'py>(
         object_dict: Bound<'py, PyDict>,
-        config: Option<py_import_config::PyImportConfig>,
+        config: Option<config::PyImportConfig>,
     ) -> PyResult<Bound<'py, PyAny>> {
         let import_obj =
             py_import_object::PyImportObject::from_dict(object_dict, config.unwrap_or_default())?;
         import_obj.try_construct_object()
+    }
+
+    /// Recursively dumps all members to a json-able dict
+    /// 
+    /// Defaults to ignoring private members (any member that is prefixed with _)
+    #[gen_stub_pyfunction]
+    #[pyfunction]
+    #[pyo3(signature = (object, config = None))]
+    fn dump_object<'py>(
+        object: Bound<'py, PyAny>,
+        config: Option<config::PyDumpConfig>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        py_import_object::recursive_serialize_py_object(object, &config.unwrap_or_default())
+    }
+    /// Dump an object to a PythonImportObject json string
+    /// Equivalent to
+    /// `json.dumps(dump_object(obj))`
+    /// 
+    /// Defaults to ignoring private members (any member that is prefixed with _)
+    #[gen_stub_pyfunction]
+    #[pyfunction]
+    #[pyo3(signature = (object, config = None, pretty=false))]
+    fn dump_object_json<'py>(
+        object: Bound<'py, PyAny>,
+        config: Option<config::PyDumpConfig>,
+        pretty: bool,
+    ) -> PyResult<String> {
+        let obj =
+            py_import_object::recursive_serialize_py_object(object, &config.unwrap_or_default())?;
+        let obj_dict = obj.cast_into::<PyDict>()?;
+        let dumped = utils::py_dict_to_serde_value(&obj_dict)?;
+        let out = match pretty {
+            true => serde_json::to_string_pretty(&dumped),
+            false => serde_json::to_string(&dumped),
+        };
+        out.map_err(|e| PyValueError::new_err(format!("{:?}", e)))
     }
 }
 define_stub_info_gatherer!(stub_info);
 
 pub mod prelude {
     use super::*;
-    pub use py_import_object::{EntryPoint, PyImportObject, PyImportType, PyObjectDeserializer};
-    pub use py_import_config::PyImportConfig;
+    pub use config::{PyDumpConfig, PyImportConfig};
+    pub use py_import_object::{
+        EntryPoint, PyImportObject, PyImportType, PyObjectDeserializer, PyObjectSerializer,
+    };
 }

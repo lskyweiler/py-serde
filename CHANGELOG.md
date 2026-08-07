@@ -1,8 +1,30 @@
+## [0.2.0] - 2026-08-07
+
+### 🚀 Features
+
+- Working serialization
+- Added pathlib and datetime support
+- Added unpack hooks to allow classes to customize behavior
+
+### 🐛 Bug Fixes
+
+- Fixed ser/de of enums
+- Added to serde value
+- Fixed logic for rust defined import paths
+- Added module path to pyclass
+
+### 🚜 Refactor
+
+- Moved data to be PyAny to be more flexible
 ## [0.1.1] - 2026-07-28
 
 ### 🐛 Bug Fixes
 
 - Exposed py import config to rust prelude
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* Prep for release v0.1.1
 ## [0.1.0] - 2026-07-28
 
 ### 🚀 Features
