@@ -4,6 +4,14 @@ Complete object deserialization, including reflected type information needed to 
 
 This was originally developed as a way to embed serialized python objects inside a rust configuration system, but can be used from python
 
+```shell
+uv add rs-unpack
+```
+
+```shell
+pip install rs-unpack
+```
+
 ### Python Usage
 ```python
 import dataclasses

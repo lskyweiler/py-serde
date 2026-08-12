@@ -70,3 +70,5 @@ docs/_build/
 .vscode/
 
 .benchmarks/
+.env
+dist/

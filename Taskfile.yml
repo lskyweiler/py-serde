@@ -2,6 +2,8 @@
 
 version: "3"
 
+dotenv: [".env"]
+
 vars:
   APP_VERSION:
     sh: cat VERSION
@@ -51,3 +53,8 @@ tasks:
     cmds:
       - uv run ruff format
       - uv run ruff check --select I --fix
+
+  upload-whls-pypi:
+    desc: Upload locally built whls to pypi
+    cmds:
+      - uv publish --token=$PYPI_TOKEN -v dist/*
